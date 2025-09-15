@@ -11,10 +11,11 @@ logger = logging.getLogger(__name__)
 
 CROP_MODEL = YOLO("models/autocrop-yolov10n-finetune.pt", task="detect")
 
+
 def crop_images_outer(input_folder):
     """Crops images in the input folder by finding the largest contour."""
     files = sorted(os.listdir(input_folder))
-    files = [os.path.join(input_folder, f) for f in files if f.endswith(('.tif'))]
+    files = [os.path.join(input_folder, f) for f in files if f.endswith((".tif"))]
 
     results = []
     for file in files:
@@ -23,8 +24,12 @@ def crop_images_outer(input_folder):
         outer_box = bbox_from_image_contours(image)
         outer_box = add_margin(outer_box, margin=(w * 0.01, h * 0.01))  # Add 1% margin
         # Cap to image size
-        outer_box = [max(0, int(outer_box[0])), max(0, int(outer_box[1])),
-                    min(w, int(outer_box[2])), min(h, int(outer_box[3]))]
+        outer_box = [
+            max(0, int(outer_box[0])),
+            max(0, int(outer_box[1])),
+            min(w, int(outer_box[2])),
+            min(h, int(outer_box[3])),
+        ]
 
         result = {
             "image_path": file,
@@ -39,21 +44,28 @@ def crop_images_outer(input_folder):
         logger.debug(f"Cropped image {file} to box: {outer_box}")
     return results
 
+
 def crop_images_inner(input_folder, batch_size=16):
     """Crops images in the input folder using the trained YOLO model."""
     files = sorted(os.listdir(input_folder))
-    files = [os.path.join(input_folder, f) for f in files if f.endswith(('.tif'))]
+    files = [os.path.join(input_folder, f) for f in files if f.endswith((".tif"))]
 
     results = []
     for i in range(0, len(files), batch_size):
-        batch = files[i:i+batch_size]
-        batch_result = CROP_MODEL.predict(batch, conf=0.1, iou=0, max_det=2, agnostic_nms=True)
+        batch = files[i : i + batch_size]
+        batch_result = CROP_MODEL.predict(
+            batch, conf=0.1, iou=0, max_det=2, agnostic_nms=True
+        )
 
         for yolo_result in batch_result:
             for box in yolo_result.boxes:
-                w_orig, h_orig = np.array(yolo_result.orig_img.shape[1::-1], dtype=np.float32)
+                w_orig, h_orig = np.array(
+                    yolo_result.orig_img.shape[1::-1], dtype=np.float32
+                )
                 if box:
-                    logger.debug(f"Cropped image {yolo_result.path} to box: {box.xyxy[0].cpu().numpy()}")
+                    logger.debug(
+                        f"Cropped image {yolo_result.path} to box: {box.xyxy[0].cpu().numpy()}"
+                    )
                     xc, yc, w, h = box.xywh[0].cpu().numpy()
 
                     # normalize by dividing by image width and height
@@ -75,16 +87,19 @@ def crop_images_inner(input_folder, batch_size=16):
                 results.append(result)
     return results
 
+
 if __name__ == "__main__":
-    folder = os.path.join(os.getenv("SCAN_DATA_PATH"), '2619711148/rawdata/1')
+    folder = os.path.join(os.getenv("SCAN_DATA_PATH"), "2619711148/rawdata/1")
     files = sorted(os.listdir(folder))[:100]
-    files = [os.path.join(folder, f) for f in files if f.endswith(('.tif'))]
+    files = [os.path.join(folder, f) for f in files if f.endswith((".tif"))]
 
     results = []
     batch_size = 16
     for i in range(0, len(files), batch_size):
-        batch = files[i:i+batch_size]
-        batch_result = CROP_MODEL.predict(batch, conf=0.1, iou=0, max_det=2, agnostic_nms=True)
+        batch = files[i : i + batch_size]
+        batch_result = CROP_MODEL.predict(
+            batch, conf=0.1, iou=0, max_det=2, agnostic_nms=True
+        )
 
         for result in batch_result:
             results.append(result)
@@ -95,8 +110,14 @@ if __name__ == "__main__":
         im = result.plot()
         outer_box = bbox_from_image_contours(result.orig_img)
         outer_box = add_margin(outer_box, margin=(10, 10))
-        cv2.rectangle(im, (int(outer_box[0]), int(outer_box[1])), (int(outer_box[2]), int(outer_box[3])), (0, 255, 0), 3)
-        
+        cv2.rectangle(
+            im,
+            (int(outer_box[0]), int(outer_box[1])),
+            (int(outer_box[2]), int(outer_box[3])),
+            (0, 255, 0),
+            3,
+        )
+
         confidence = result.boxes.conf[0] if result.boxes else 0
-        
+
         st.image(im, width=500, caption=f"Confidence: {confidence:.2f}")

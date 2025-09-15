@@ -33,17 +33,20 @@ import os
 
 
 def _lname(tag: str) -> str:
-    return tag.split('}', 1)[-1] if '}' in tag else tag
+    return tag.split("}", 1)[-1] if "}" in tag else tag
+
 
 def _find_children(elem, name: str):
     for ch in list(elem):
         if _lname(ch.tag) == name:
             yield ch
 
+
 def _find_first(elem, name: str):
     for ch in _find_children(elem, name):
         return ch
     return None
+
 
 def _get_num_attr(el, candidates):
     if el is None:
@@ -54,29 +57,32 @@ def _get_num_attr(el, candidates):
             try:
                 return float(v)
             except ValueError:
-                num = ''.join(c for c in v if (c.isdigit() or c in '.-+eE'))
+                num = "".join(c for c in v if (c.isdigit() or c in ".-+eE"))
                 try:
-                    return float(num) if num not in ('', '+', '-', '.', 'e', 'E') else None
+                    return (
+                        float(num) if num not in ("", "+", "-", ".", "e", "E") else None
+                    )
                 except ValueError:
                     pass
     return None
 
+
 def _parse_fix_orientation_angle(params_el) -> Optional[float]:
     if params_el is None:
         return None
-    angle = _get_num_attr(params_el, ['rotation', 'angle', 'degrees'])
+    angle = _get_num_attr(params_el, ["rotation", "angle", "degrees"])
     if angle is not None:
         return angle
     for ch in params_el.iter():
         if ch is params_el:
             continue
-        if _lname(ch.tag) in ('rotation', 'angle', 'degrees'):
+        if _lname(ch.tag) in ("rotation", "angle", "degrees"):
             try:
-                return float((ch.text or '').strip())
+                return float((ch.text or "").strip())
             except ValueError:
                 pass
-    txt = ET.tostring(params_el, encoding='unicode')
-    tokens = ''.join((c if c.isdigit() or c in ' .-+' else ' ') for c in txt).split()
+    txt = ET.tostring(params_el, encoding="unicode")
+    tokens = "".join((c if c.isdigit() or c in " .-+" else " ") for c in txt).split()
     for t in tokens:
         try:
             return float(t)
@@ -84,7 +90,10 @@ def _parse_fix_orientation_angle(params_el) -> Optional[float]:
             continue
     return None
 
-def load_scantailor_crops(project_path: str, prefix: str) -> Dict[str, List[Dict[str, Any]]]:
+
+def load_scantailor_crops(
+    project_path: str, prefix: str
+) -> Dict[str, List[Dict[str, Any]]]:
     """
     - Each source image may contain multiple logical pages (e.g., split pages).
     - Rotation = (Fix Orientation) + (Deskew), in degrees.
@@ -96,33 +105,33 @@ def load_scantailor_crops(project_path: str, prefix: str) -> Dict[str, List[Dict
     # --- Resolve directories, files, images, pages ---
     dir_map = {}
     for directories in root.iter():
-        if _lname(directories.tag) == 'directories':
-            for d in _find_children(directories, 'directory'):
-                dir_map[d.attrib.get('id')] = d.attrib.get('path')
+        if _lname(directories.tag) == "directories":
+            for d in _find_children(directories, "directory"):
+                dir_map[d.attrib.get("id")] = d.attrib.get("path")
             break
 
     file_map = {}
     for files in root.iter():
-        if _lname(files.tag) == 'files':
-            for f in _find_children(files, 'file'):
-                file_map[f.attrib.get('id')] = {
-                    'dirId': f.attrib.get('dirId'),
-                    'name': f.attrib.get('name'),
+        if _lname(files.tag) == "files":
+            for f in _find_children(files, "file"):
+                file_map[f.attrib.get("id")] = {
+                    "dirId": f.attrib.get("dirId"),
+                    "name": f.attrib.get("name"),
                 }
             break
 
     image_to_file = {}
     for images in root.iter():
-        if _lname(images.tag) == 'images':
-            for im in _find_children(images, 'image'):
-                image_to_file[im.attrib.get('id')] = im.attrib.get('fileId')
+        if _lname(images.tag) == "images":
+            for im in _find_children(images, "image"):
+                image_to_file[im.attrib.get("id")] = im.attrib.get("fileId")
             break
 
     page_to_image = {}
     for pages in root.iter():
-        if _lname(pages.tag) == 'pages':
-            for p in _find_children(pages, 'page'):
-                page_to_image[p.attrib.get('id')] = p.attrib.get('imageId')
+        if _lname(pages.tag) == "pages":
+            for p in _find_children(pages, "page"):
+                page_to_image[p.attrib.get("id")] = p.attrib.get("imageId")
             break
 
     def page_to_filename(page_id: str) -> Optional[str]:
@@ -135,77 +144,83 @@ def load_scantailor_crops(project_path: str, prefix: str) -> Dict[str, List[Dict
         f = file_map.get(file_id)
         if not f:
             return None
-        return Path(f['name']).name
+        return Path(f["name"]).name
 
     # --- Collect per-page parameters ---
     deskew_angles = {}
     for el in root.iter():
-        if _lname(el.tag) == 'deskew':
-            for pg in _find_children(el, 'page'):
-                pid = pg.attrib.get('id')
-                params = _find_first(pg, 'params')
-                angle = _get_num_attr(params, ['angle'])
+        if _lname(el.tag) == "deskew":
+            for pg in _find_children(el, "page"):
+                pid = pg.attrib.get("id")
+                params = _find_first(pg, "params")
+                angle = _get_num_attr(params, ["angle"])
                 if angle is not None:
                     deskew_angles[pid] = angle
 
     orientation_angles = {}
     for el in root.iter():
-        if _lname(el.tag) in ('fix-orientation', 'fix_orientation', 'fixorientation'):
-            for pg in _find_children(el, 'image'):
-                pid = pg.attrib.get('id')
-                params = _find_first(pg, 'rotation')
-                angle = _get_num_attr(params, ['degrees'])
+        if _lname(el.tag) in ("fix-orientation", "fix_orientation", "fixorientation"):
+            for pg in _find_children(el, "image"):
+                pid = pg.attrib.get("id")
+                params = _find_first(pg, "rotation")
+                angle = _get_num_attr(params, ["degrees"])
                 if angle is not None:
                     orientation_angles[pid] = angle
 
     content_rects = {}
     for el in root.iter():
-        if _lname(el.tag) == 'select-content':
-            for pg in _find_children(el, 'page'):
-                pid = pg.attrib.get('id')
-                params = _find_first(pg, 'params')
+        if _lname(el.tag) == "select-content":
+            for pg in _find_children(el, "page"):
+                pid = pg.attrib.get("id")
+                params = _find_first(pg, "params")
                 if params is None:
                     continue
                 crect = None
                 for ch in params:
-                    if _lname(ch.tag) == 'content-rect':
+                    if _lname(ch.tag) == "content-rect":
                         crect = ch
                         break
                 if crect is None:
                     for ch in params:
-                        if _lname(ch.tag) == 'page-rect':
+                        if _lname(ch.tag) == "page-rect":
                             crect = ch
                             break
                 if crect is None:
                     continue
                 try:
-                    x = int(float(crect.attrib['x']))
-                    y = int(float(crect.attrib['y']))
-                    w = int(float(crect.attrib['width']))
-                    h = int(float(crect.attrib['height']))
+                    x = int(float(crect.attrib["x"]))
+                    y = int(float(crect.attrib["y"]))
+                    w = int(float(crect.attrib["width"]))
+                    h = int(float(crect.attrib["height"]))
                     content_rects[pid] = (x, y, w, h)
                 except (KeyError, ValueError):
                     pass
-    
+
     split_pages = {}
     for el in root.iter():
-        if _lname(el.tag) == 'page-split':
-            for img in _find_children(el, 'image'):
-                pid = img.attrib.get('id')
-                params = _find_first(img, 'params')
+        if _lname(el.tag) == "page-split":
+            for img in _find_children(el, "image"):
+                pid = img.attrib.get("id")
+                params = _find_first(img, "params")
                 if params is None:
                     continue
-                pages = _find_first(params, 'pages')
-                if pages.get('type') != "two-pages":
+                pages = _find_first(params, "pages")
+                if pages.get("type") != "two-pages":
                     continue
-                cutter1 = _find_first(pages, 'cutter1')
+                cutter1 = _find_first(pages, "cutter1")
                 if cutter1 is not None:
-                    p1 = _find_first(cutter1, 'p1')
-                    p2 = _find_first(cutter1, 'p2')
+                    p1 = _find_first(cutter1, "p1")
+                    p2 = _find_first(cutter1, "p2")
                     if p1 is not None and p2 is not None:
                         split_pages[pid] = {
-                            "p1": (int(float(p1.attrib['x'])), int(float(p1.attrib['y']))),
-                            "p2": (int(float(p2.attrib['x'])), int(float(p2.attrib['y'])))
+                            "p1": (
+                                int(float(p1.attrib["x"])),
+                                int(float(p1.attrib["y"])),
+                            ),
+                            "p2": (
+                                int(float(p2.attrib["x"])),
+                                int(float(p2.attrib["y"])),
+                            ),
                         }
 
     # --- Build grouped results: image_name -> list of page dicts ---
@@ -226,7 +241,7 @@ def load_scantailor_crops(project_path: str, prefix: str) -> Dict[str, List[Dict
         rot = 0.0
         if pid in deskew_angles:
             rot += float(deskew_angles[pid])
-        
+
         if multipage_pid in orientation_angles:
             grouped[img_name]["orientation"] = int(orientation_angles[multipage_pid])
 
@@ -235,22 +250,38 @@ def load_scantailor_crops(project_path: str, prefix: str) -> Dict[str, List[Dict
         else:
             x = y = w = h = None
 
-        grouped[img_name]["crop"].append({
-            "rotation": rot,
-            "x": x, "y": y, "width": w, "height": h,
-        })
+        grouped[img_name]["crop"].append(
+            {
+                "rotation": rot,
+                "x": x,
+                "y": y,
+                "width": w,
+                "height": h,
+            }
+        )
 
         if multipage_pid in split_pages:
             grouped[img_name]["split"] = split_pages[multipage_pid]
 
     return dict(grouped)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract ScanTailor crop data.")
-    parser.add_argument("--input", type=str, default=os.getenv("SCAN_DATA_PATH"), help="Path to the input directory containing ScanTailor projects.")
-    parser.add_argument("--output", type=str, default="datasets/scantailor_data", help="Path to the output directory where JSON files will be saved.")
+    parser.add_argument(
+        "--input",
+        type=str,
+        default=os.getenv("SCAN_DATA_PATH"),
+        help="Path to the input directory containing ScanTailor projects.",
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="datasets/scantailor_data",
+        help="Path to the output directory where JSON files will be saved.",
+    )
     args = parser.parse_args()
-    
+
     # Load all directories containing ScanTailor projects
     scan_dirs = os.listdir(args.input)
 
@@ -260,9 +291,11 @@ if __name__ == "__main__":
 
         project_path = os.path.join(args.input, dir, "scanTailor")
         data = {}
-        
+
         # A project contains multiple .scanTailor files called 1.scanTailor, 2, 3...
-        scantailor_files = [f for f in os.listdir(project_path) if f.endswith('.scanTailor')]
+        scantailor_files = [
+            f for f in os.listdir(project_path) if f.endswith(".scanTailor")
+        ]
         for file in sorted(scantailor_files):
             scantailor_path = os.path.join(project_path, file)
             prefix = file.split(".")[0]
@@ -272,4 +305,3 @@ if __name__ == "__main__":
         print(f"Found data for {dir}, files {scantailor_files}")
         with open(os.path.join(args.output, f"{dir}.json"), "w") as f:
             json.dump(data, f, indent=4)
-

@@ -1,7 +1,7 @@
 import argparse
 import os
 from dataclasses import dataclass
-from typing import Tuple, Optional
+from typing import Tuple
 
 import comet_ml
 import cv2
@@ -26,6 +26,7 @@ class RandomRotateWithLabel:
     If no rotation is applied, angle = 0.
     Uses white background fill (255) which is suitable for book pages.
     """
+
     def __init__(self, max_deg: float, p: float = 1.0):
         self.max_deg = float(max_deg)
         self.p = float(p)
@@ -50,6 +51,7 @@ class PageAngleDataset(Dataset):
 
     Targets are degrees in [-angle_max, +angle_max].
     """
+
     def __init__(
         self,
         images_dir: str,
@@ -58,14 +60,21 @@ class PageAngleDataset(Dataset):
         angle_max: float = 10.0,
         aug_rotate_prob: float = 1.0,
     ):
-        
         self.is_train = is_train
         self.images_dir = images_dir
         self.angle_max = float(angle_max)
         self.aug_rotate_prob = float(aug_rotate_prob)
-        self.df = pd.DataFrame({
-            "filename": sorted([f for f in os.listdir(images_dir) if f.endswith((".png", ".jpg", ".jpeg", ".tif"))])
-        })
+        self.df = pd.DataFrame(
+            {
+                "filename": sorted(
+                    [
+                        f
+                        for f in os.listdir(images_dir)
+                        if f.endswith((".png", ".jpg", ".jpeg", ".tif"))
+                    ]
+                )
+            }
+        )
 
         # We'll apply rotation on the PIL image FIRST (label-aware), then resize/crop/normalize.
         self.rotate_tf = RandomRotateWithLabel(
@@ -74,19 +83,27 @@ class PageAngleDataset(Dataset):
         )
 
         if self.is_train:
-            self.after_tf = transforms.Compose([
-                transforms.RandomResizedCrop(image_size, scale=(0.6, 0.8), ratio=(1, 1)),
-                transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.05, hue=0.02),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
-            ])
+            self.after_tf = transforms.Compose(
+                [
+                    transforms.RandomResizedCrop(
+                        image_size, scale=(0.6, 0.8), ratio=(1, 1)
+                    ),
+                    transforms.ColorJitter(
+                        brightness=0.2, contrast=0.2, saturation=0.05, hue=0.02
+                    ),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
+                ]
+            )
         else:
-            self.after_tf = transforms.Compose([
-                transforms.Resize(image_size),
-                transforms.CenterCrop(image_size),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
-            ])
+            self.after_tf = transforms.Compose(
+                [
+                    transforms.Resize(image_size),
+                    transforms.CenterCrop(image_size),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
+                ]
+            )
 
     def __len__(self):
         return len(self.df)
@@ -103,10 +120,9 @@ class PageAngleDataset(Dataset):
 
         # 1) Label by adding rotation
         img_rot, target_deg = self.rotate_tf(img_pil)
-        
+
         # 3) Augment
         img_t = self.after_tf(img_rot)
-        
 
         # Return tensor target shape (1,)
         return img_t, torch.tensor([target_deg], dtype=torch.float32), target_deg
@@ -117,6 +133,7 @@ class PageAngleDataset(Dataset):
 # -------------------------------
 class DegreeHead(nn.Module):
     """Features -> degrees in [-angle_max, angle_max] via tanh bound."""
+
     def __init__(self, in_features: int, angle_max: float = 10.0):
         super().__init__()
         self.angle_max = float(angle_max)
@@ -144,17 +161,19 @@ class AngleDegModel(nn.Module):
     def forward(self, x):
         feats = self.backbone(x)
         return self.head(feats)  # (B,1)
-    
+
     def predict_image(self, img_bgr: np.ndarray) -> float:
         """Predict angle for a single image (numpy BGR)."""
         img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
         img_pil = Image.fromarray(img_rgb)
-        tf = transforms.Compose([
-            transforms.Resize(640),
-            transforms.CenterCrop(640),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
-        ])
+        tf = transforms.Compose(
+            [
+                transforms.Resize(640),
+                transforms.CenterCrop(640),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
+            ]
+        )
         img_t = tf(img_pil).unsqueeze(0)  # (1,3,H,W)
         self.eval()
         with torch.no_grad():
@@ -197,7 +216,7 @@ def train_one_epoch(model, loader, optimizer, scaler, device, criterion):
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None:
             with torch.autocast(device_type=device.type, dtype=torch.float16):
-                outputs = model(imgs)            # (B,1) in [-angle_max, angle_max]
+                outputs = model(imgs)  # (B,1) in [-angle_max, angle_max]
                 loss = criterion(outputs, targets)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -234,12 +253,15 @@ def evaluate(model, loader, device, criterion) -> Tuple[float, float]:
 
 def save_checkpoint(path, model, optimizer, epoch, best_mae):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    torch.save({
-        "model": model.state_dict(),
-        "optimizer": optimizer.state_dict(),
-        "epoch": epoch,
-        "best_mae": best_mae,
-    }, path)
+    torch.save(
+        {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "epoch": epoch,
+            "best_mae": best_mae,
+        },
+        path,
+    )
 
 
 def load_checkpoint(path, model, optimizer=None, map_location="cpu"):
@@ -251,7 +273,9 @@ def load_checkpoint(path, model, optimizer=None, map_location="cpu"):
 
 
 def main():
-    comet_ml.login(project_name="autorotate_finetune", api_key=os.getenv("COMET_ML_API_KEY"))
+    comet_ml.login(
+        project_name="autorotate_finetune", api_key=os.getenv("COMET_ML_API_KEY")
+    )
     experiment = comet_ml.Experiment(project_name="autorotate_finetune")
 
     ap = argparse.ArgumentParser()
@@ -267,9 +291,18 @@ def main():
     ap.add_argument("--no-amp", action="store_true")
     ap.add_argument("--resume", default="", type=str)
     ap.add_argument("--angle-max", default=10.0, type=float)
-    ap.add_argument("--aug-rotate-prob", default=1.0, type=float, help="probability to apply rotation on train")
-    ap.add_argument("--aug-rotate-max", default=None, type=float,
-                    help="max |deg| for augmentation rotation; default = angle_max")
+    ap.add_argument(
+        "--aug-rotate-prob",
+        default=1.0,
+        type=float,
+        help="probability to apply rotation on train",
+    )
+    ap.add_argument(
+        "--aug-rotate-max",
+        default=None,
+        type=float,
+        help="max |deg| for augmentation rotation; default = angle_max",
+    )
     args = ap.parse_args()
 
     cfg = TrainConfig(
@@ -293,24 +326,40 @@ def main():
 
     # Datasets & loaders
     train_ds = PageAngleDataset(
-        cfg.images_train, cfg.image_size, is_train=True,
+        cfg.images_train,
+        cfg.image_size,
+        is_train=True,
         angle_max=cfg.angle_max,
-        aug_rotate_prob=cfg.aug_rotate_prob
+        aug_rotate_prob=cfg.aug_rotate_prob,
     )
     val_ds = PageAngleDataset(
-        cfg.images_val, cfg.image_size, is_train=False,
+        cfg.images_val,
+        cfg.image_size,
+        is_train=False,
         angle_max=cfg.angle_max,
-        aug_rotate_prob=cfg.aug_rotate_prob
+        aug_rotate_prob=cfg.aug_rotate_prob,
     )
 
-    train_loader = DataLoader(train_ds, batch_size=cfg.batch_size, shuffle=True,
-                              num_workers=cfg.num_workers, pin_memory=True)
-    val_loader = DataLoader(val_ds, batch_size=cfg.batch_size, shuffle=False,
-                            num_workers=cfg.num_workers, pin_memory=True)
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=cfg.num_workers,
+        pin_memory=True,
+    )
+    val_loader = DataLoader(
+        val_ds,
+        batch_size=cfg.batch_size,
+        shuffle=False,
+        num_workers=cfg.num_workers,
+        pin_memory=True,
+    )
 
     # Model, optimizer, loss
     model = AngleDegModel(cfg.angle_max).to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    optimizer = optim.AdamW(
+        model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
+    )
     criterion = nn.HuberLoss(delta=1.0)
 
     scaler = torch.amp.GradScaler(device=device)
@@ -326,10 +375,14 @@ def main():
     ckpt_last = os.path.join(cfg.out_dir, "last.pth")
 
     for epoch in range(start_epoch, cfg.epochs):
-        print(f"\nEpoch {epoch+1}/{cfg.epochs}")
-        train_loss = train_one_epoch(model, train_loader, optimizer, scaler, device, criterion)
+        print(f"\nEpoch {epoch + 1}/{cfg.epochs}")
+        train_loss = train_one_epoch(
+            model, train_loader, optimizer, scaler, device, criterion
+        )
         val_loss, val_mae = evaluate(model, val_loader, device, criterion)
-        print(f"Train loss: {train_loss:.5f} | Val loss: {val_loss:.5f} | Val MAE: {val_mae:.3f}°")
+        print(
+            f"Train loss: {train_loss:.5f} | Val loss: {val_loss:.5f} | Val MAE: {val_mae:.3f}°"
+        )
 
         # Log to Comet.ml
         experiment.log_metric("train/loss", train_loss, step=epoch)
@@ -347,20 +400,23 @@ def main():
 
 
 if __name__ == "__main__":
-    #main()
+    # main()
 
     # load and test the model
     model = AngleDegModel(angle_max=10.0)
     ckpt_path = "checkpoints_deg/best.pth"
     load_checkpoint(ckpt_path, model, map_location="cpu")
     images_path = "datasets/yolo2/images/val"
-    dataset = PageAngleDataset(images_path, image_size=640, is_train=True, angle_max=10.0, aug_rotate_prob=1.0)
-    loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
-    
+    dataset = PageAngleDataset(
+        images_path, image_size=640, is_train=True, angle_max=10.0, aug_rotate_prob=1.0
+    )
+    loader = DataLoader(
+        dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True
+    )
+
     # process and display with streamlit
     import streamlit as st
-    
-    
+
     st.title("Rotation Model Inference")
     model.eval()
     for imgs, _, true_deg in tqdm(loader, desc="Inference"):

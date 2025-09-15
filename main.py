@@ -24,7 +24,9 @@ def run_crop_pipeline(title: str, crop_method="inner", rotation_method="hough"):
         title (str): Path to the folder containing images to process.
         method (str): "hough" or "ml" for deskewing method.
     """
-    logger.info(f"Running crop pipeline on {title} with crop_method={crop_method}, rotation_method={rotation_method}")
+    logger.info(
+        f"Running crop pipeline on {title} with crop_method={crop_method}, rotation_method={rotation_method}"
+    )
 
     if crop_method == "inner":
         results = crop_images_inner(title, batch_size=16)
@@ -34,7 +36,10 @@ def run_crop_pipeline(title: str, crop_method="inner", rotation_method="hough"):
     for result in results:
         im = cv2.imread(result["image_path"])
         h, w = im.shape[0], im.shape[1]
-        x1, y1, x2, y2 = xywh_to_xyxy_denorm((result["x_center"], result["y_center"], result["width"], result["height"]), (w, h))
+        x1, y1, x2, y2 = xywh_to_xyxy_denorm(
+            (result["x_center"], result["y_center"], result["width"], result["height"]),
+            (w, h),
+        )
         crop = im[y1:y2, x1:x2]
 
         if rotation_method == "hough":
@@ -43,7 +48,9 @@ def run_crop_pipeline(title: str, crop_method="inner", rotation_method="hough"):
             angle = ROTATION_MODEL.predict_image(crop)
         result["angle"] = angle
 
-        M = cv2.getRotationMatrix2D((result["x_center"] * w, result["y_center"] * h), angle, 1.0)
+        M = cv2.getRotationMatrix2D(
+            (result["x_center"] * w, result["y_center"] * h), angle, 1.0
+        )
         deskewed = cv2.warpAffine(im, M, (w, h))
         deskewed_crop = deskewed[y1:y2, x1:x2]
 
@@ -55,6 +62,6 @@ def run_crop_pipeline(title: str, crop_method="inner", rotation_method="hough"):
 
 
 if __name__ == "__main__":
-    path = os.path.join(os.getenv("SCAN_DATA_PATH"), '2618768765/rawdata/1')
+    path = os.path.join(os.getenv("SCAN_DATA_PATH"), "2618768765/rawdata/1")
     path = "/Users/lucienovotna/Downloads/knav-1"
     run_crop_pipeline(path, crop_method="outer", rotation_method="hough")

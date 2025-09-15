@@ -7,10 +7,10 @@ import streamlit as st
 import os
 
 
-project_path = os.path.join(os.getenv("SCAN_DATA_PATH"), '2619711148')
+project_path = os.path.join(os.getenv("SCAN_DATA_PATH"), "2619711148")
 ground_truth_path = f"data/dataset/{project_path.split('/')[-1]}.json"
 
-with open(ground_truth_path, 'r') as f:
+with open(ground_truth_path, "r") as f:
     ground_truth = json.load(f)
 
 for image, data in list(ground_truth.items()):
@@ -24,8 +24,10 @@ for image, data in list(ground_truth.items()):
         # draw division line
         cv2.line(img, data["split"]["p1"], data["split"]["p2"], (255, 0, 0), 4)
         # add division offset to the right page
-        data["crop"][1]["x"] = data["crop"][1]["x"] + min(data["split"]["p1"][0], data["split"]["p2"][0])
-    
+        data["crop"][1]["x"] = data["crop"][1]["x"] + min(
+            data["split"]["p1"][0], data["split"]["p2"][0]
+        )
+
     # rotate image
     if data["crop"][0]["rotation"] != 0:
         (h, w) = img.shape[:2]
@@ -53,6 +55,6 @@ for image, data in list(ground_truth.items()):
     for crop in data["crop"]:
         x, y, w, h = crop["x"], crop["y"], crop["width"], crop["height"]
         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 4)
-    
+
     st.image(img, caption=image, use_container_width=True)
     st.write(f"Image: {image}, properties: {data}")
