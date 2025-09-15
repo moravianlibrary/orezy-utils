@@ -1,0 +1,11 @@
+# Dataset root directory relative to the yolov5 directory
+path: yolo-split_per_book
+
+# Train/val/test sets: specify directories, *.txt files, or lists
+train: images/train
+val: images/val
+test: # Optional path to test images
+
+# Classes (example using 80 COCO classes)
+names:
+    0: text
