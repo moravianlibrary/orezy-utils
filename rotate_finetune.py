@@ -189,7 +189,7 @@ class AngleDegModel(nn.Module):
 class TrainConfig:
     images_train: str
     images_val: str
-    out_dir: str = "checkpoints_deg"
+    out_dir: str = "rotate_finetune_model"
     image_size: int = 224
     batch_size: int = 32
     epochs: int = 20
@@ -281,10 +281,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--images-train", default="datasets/yolo2/images/train", type=str)
     ap.add_argument("--images-val", default="datasets/yolo2/images/val", type=str)
-    ap.add_argument("--out-dir", default="checkpoints_deg", type=str)
+    ap.add_argument("--out-dir", default="rotate_finetune_model", type=str)
     ap.add_argument("--image-size", default=640, type=int)
     ap.add_argument("--batch-size", default=32, type=int)
-    ap.add_argument("--epochs", default=10, type=int)
+    ap.add_argument("--epochs", default=100, type=int)
     ap.add_argument("--lr", default=3e-4, type=float)
     ap.add_argument("--weight-decay", default=1e-4, type=float)
     ap.add_argument("--num-workers", default=4, type=int)
@@ -400,11 +400,11 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
+    main()
 
     # load and test the model
     model = AngleDegModel(angle_max=10.0)
-    ckpt_path = "checkpoints_deg/best.pth"
+    ckpt_path = "rotate_finetune_model/best.pth"
     load_checkpoint(ckpt_path, model, map_location="cpu")
     images_path = "datasets/yolo2/images/val"
     dataset = PageAngleDataset(

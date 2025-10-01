@@ -150,7 +150,7 @@ def visualize(clusters, title):
 
 
 if __name__ == "__main__":
-    path = os.path.join(os.getenv("SCAN_DATA_PATH"), "2610046696/rawdata/1")
+    path = os.getenv("SCAN_DATA_PATH")
     files = load_images(path)
 
     bbox_labels = cluster_features(files, get_feature_vec_scan_position, n_clusters=2)

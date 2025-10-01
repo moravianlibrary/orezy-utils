@@ -271,7 +271,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input",
         type=str,
-        default=os.getenv("SCAN_DATA_PATH"),
         help="Path to the input directory containing ScanTailor projects.",
     )
     parser.add_argument(

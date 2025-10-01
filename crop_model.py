@@ -9,7 +9,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-CROP_MODEL = YOLO("models/autocrop-yolov10n-finetune.pt", task="detect")
+CROP_MODEL = YOLO("crop_finetune_model/train2/weights/best.pt", task="detect")
 
 
 def crop_images_outer(input_folder):
@@ -48,7 +48,9 @@ def crop_images_outer(input_folder):
 def crop_images_inner(input_folder, batch_size=16):
     """Crops images in the input folder using the trained YOLO model."""
     files = sorted(os.listdir(input_folder))
-    files = [os.path.join(input_folder, f) for f in files if f.endswith((".tif"))]
+    files = [os.path.join(input_folder, f) for f in files if f.lower().endswith((".tif", ".tiff", ".jpg"))]
+
+    logger.info(f"Found {len(files)} images in {input_folder} to crop.")
 
     results = []
     for i in range(0, len(files), batch_size):
@@ -58,7 +60,7 @@ def crop_images_inner(input_folder, batch_size=16):
         )
 
         for yolo_result in batch_result:
-            for box in yolo_result.boxes:
+            for box in reversed(yolo_result.boxes):
                 w_orig, h_orig = np.array(
                     yolo_result.orig_img.shape[1::-1], dtype=np.float32
                 )
@@ -83,13 +85,28 @@ def crop_images_inner(input_folder, batch_size=16):
                     "width": float(w),
                     "height": float(h),
                     "confidence": float(box.conf.item()) if box else 0,
+                    "flags": ["low_confidence"] if box and box.conf.item() < 0.7 else [],
                 }
                 results.append(result)
+    
+    # Add entries for files not detected by YOLO (not in results)
+    detected_paths = {res["image_path"] for res in results}
+    for file in files:
+        if file not in detected_paths:
+            result = {
+                "image_path": file,
+                "x_center": 0.5,
+                "y_center": 0.5,
+                "width": 1.0,
+                "height": 1.0,
+                "confidence": 0,
+            }
+            results.append(result)
     return results
 
 
 if __name__ == "__main__":
-    folder = os.path.join(os.getenv("SCAN_DATA_PATH"), "2619711148/rawdata/1")
+    folder = os.getenv("SCAN_DATA_PATH")
     files = sorted(os.listdir(folder))[:100]
     files = [os.path.join(folder, f) for f in files if f.endswith((".tif"))]
 

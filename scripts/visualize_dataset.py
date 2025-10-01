@@ -7,7 +7,7 @@ import streamlit as st
 import os
 
 
-project_path = os.path.join(os.getenv("SCAN_DATA_PATH"), "2619711148")
+project_path = os.getenv("SCAN_DATA_PATH")
 ground_truth_path = f"data/dataset/{project_path.split('/')[-1]}.json"
 
 with open(ground_truth_path, "r") as f:

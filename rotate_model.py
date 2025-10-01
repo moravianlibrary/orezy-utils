@@ -113,7 +113,7 @@ def get_skew_angle_hough(img) -> Optional[float]:
 
 
 if __name__ == "__main__":
-    folder = os.path.join(os.getenv("SCAN_DATA_PATH"), "2619711148/rawdata/1")
+    folder = os.getenv("SCAN_DATA_PATH")
     files = sorted(os.listdir(folder))[:100]
 
     for file in files:

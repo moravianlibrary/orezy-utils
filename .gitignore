@@ -5,11 +5,15 @@ build/
 dist/
 wheels/
 *.egg-info
-# Virtual environments
+.DS_Store
+
+# Environment
 .venv
 .env
+launch.json
 
 # Train data
 datasets/
-crop_finetune/
-rotate_finetune/
+crop_finetune_model/
+rotate_finetune_model/
+exports/

@@ -6,13 +6,10 @@ from rotate_finetune import AngleDegModel, load_checkpoint
 from rotate_model import get_skew_angle_hough
 from utils import xywh_to_xyxy_denorm
 import logging
+import argparse
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-ROTATION_MODEL = AngleDegModel(angle_max=10.0)
-ckpt_path = "checkpoints_deg/best.pth"
-load_checkpoint(ckpt_path, ROTATION_MODEL, map_location="cpu")
 
 
 def run_crop_pipeline(title: str, crop_method="inner", rotation_method="hough"):
@@ -42,10 +39,7 @@ def run_crop_pipeline(title: str, crop_method="inner", rotation_method="hough"):
         )
         crop = im[y1:y2, x1:x2]
 
-        if rotation_method == "hough":
-            angle = get_skew_angle_hough(crop)
-        else:
-            angle = ROTATION_MODEL.predict_image(crop)
+        angle = get_skew_angle_hough(crop)
         result["angle"] = angle
 
         M = cv2.getRotationMatrix2D(
@@ -60,8 +54,18 @@ def run_crop_pipeline(title: str, crop_method="inner", rotation_method="hough"):
     logger.info(f"Processed {len(results)} images from {title}")
     logger.debug(f"Results: {results}")
 
+    return results
 
 if __name__ == "__main__":
-    path = os.path.join(os.getenv("SCAN_DATA_PATH"), "2618768765/rawdata/1")
-    path = "/Users/lucienovotna/Downloads/knav-1"
-    run_crop_pipeline(path, crop_method="outer", rotation_method="hough")
+    parser = argparse.ArgumentParser(description="Run crop pipeline on scanned images.")
+    parser.add_argument(
+        "--input_path",
+        type=str,
+        default=os.getenv("SCAN_DATA_PATH"),
+        help="Path to the folder containing images to process (default: SCAN_DATA_PATH env variable)",
+    )
+    args = parser.parse_args()
+
+    logger.info(f"Using SCAN_DATA_PATH from environment: {args.input_path}")
+
+    results = run_crop_pipeline(args.input_path, crop_method="inner", rotation_method="hough")
