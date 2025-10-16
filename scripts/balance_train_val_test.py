@@ -38,7 +38,21 @@ prefix = "datasets/yolo-split_per_book/images/"
 
 for folder in ["train", "val", "test"]:
     path = os.path.join(prefix, folder)
-    num_files = len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
+    num_files = len(
+        [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+    )
     print(f"{folder}: {num_files} files")
-    percent = (num_files / sum(len([f for f in os.listdir(os.path.join(prefix, d)) if os.path.isfile(os.path.join(prefix, d, f))]) for d in ["train", "val", "test"])) * 100
+    percent = (
+        num_files
+        / sum(
+            len(
+                [
+                    f
+                    for f in os.listdir(os.path.join(prefix, d))
+                    if os.path.isfile(os.path.join(prefix, d, f))
+                ]
+            )
+            for d in ["train", "val", "test"]
+        )
+    ) * 100
     print(f"{folder}: {percent:.2f}%")

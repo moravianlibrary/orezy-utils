@@ -2,7 +2,6 @@ import os
 import cv2
 import streamlit as st
 from crop_model import crop_images_inner, crop_images_outer
-from rotate_finetune import AngleDegModel, load_checkpoint
 from rotate_model import get_skew_angle_hough
 from utils import xywh_to_xyxy_denorm
 import logging
@@ -56,6 +55,7 @@ def run_crop_pipeline(title: str, crop_method="inner", rotation_method="hough"):
 
     return results
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run crop pipeline on scanned images.")
     parser.add_argument(
@@ -68,4 +68,6 @@ if __name__ == "__main__":
 
     logger.info(f"Using SCAN_DATA_PATH from environment: {args.input_path}")
 
-    results = run_crop_pipeline(args.input_path, crop_method="inner", rotation_method="hough")
+    results = run_crop_pipeline(
+        args.input_path, crop_method="inner", rotation_method="hough"
+    )

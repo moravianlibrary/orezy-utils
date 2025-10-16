@@ -48,7 +48,11 @@ def crop_images_outer(input_folder):
 def crop_images_inner(input_folder, batch_size=16):
     """Crops images in the input folder using the trained YOLO model."""
     files = sorted(os.listdir(input_folder))
-    files = [os.path.join(input_folder, f) for f in files if f.lower().endswith((".tif", ".tiff", ".jpg"))]
+    files = [
+        os.path.join(input_folder, f)
+        for f in files
+        if f.lower().endswith((".tif", ".tiff", ".jpg"))
+    ]
 
     logger.info(f"Found {len(files)} images in {input_folder} to crop.")
 
@@ -85,10 +89,12 @@ def crop_images_inner(input_folder, batch_size=16):
                     "width": float(w),
                     "height": float(h),
                     "confidence": float(box.conf.item()) if box else 0,
-                    "flags": ["low_confidence"] if box and box.conf.item() < 0.7 else [],
+                    "flags": ["low_confidence"]
+                    if box and box.conf.item() < 0.7
+                    else [],
                 }
                 results.append(result)
-    
+
     # Add entries for files not detected by YOLO (not in results)
     detected_paths = {res["image_path"] for res in results}
     for file in files:
