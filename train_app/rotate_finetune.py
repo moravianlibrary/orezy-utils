@@ -54,25 +54,23 @@ class PageAngleDataset(Dataset):
 
     def __init__(
         self,
-        images_dir: str,
+        image_paths: list[str],
         image_size: int = 640,
         is_train: bool = True,
         angle_max: float = 10.0,
         aug_rotate_prob: float = 1.0,
     ):
         self.is_train = is_train
-        self.images_dir = images_dir
+        self.image_paths = image_paths
         self.angle_max = float(angle_max)
         self.aug_rotate_prob = float(aug_rotate_prob)
         self.df = pd.DataFrame(
             {
-                "filename": sorted(
-                    [
-                        f
-                        for f in os.listdir(images_dir)
-                        if f.endswith((".png", ".jpg", ".jpeg", ".tif"))
-                    ]
-                )
+                "filename": [
+                    f
+                    for f in self.image_paths
+                    if f.endswith((".png", ".jpg", ".jpeg", ".tif"))
+                ]
             }
         )
 
@@ -109,8 +107,7 @@ class PageAngleDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, idx: int):
-        row = self.df.iloc[idx]
-        img_path = os.path.join(self.images_dir, row["filename"])
+        img_path = self.df.iloc[idx]["filename"]
 
         img_bgr = cv2.imread(img_path, cv2.IMREAD_COLOR)
         if img_bgr is None:
@@ -162,24 +159,27 @@ class AngleDegModel(nn.Module):
         feats = self.backbone(x)
         return self.head(feats)  # (B,1)
 
-    def predict_image(self, img_bgr: np.ndarray) -> float:
-        """Predict angle for a single image (numpy BGR)."""
-        img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        img_pil = Image.fromarray(img_rgb)
+    def predict(self, imgs: np.ndarray) -> np.ndarray:
+        """
+        Predict angles for a batch of images.
+        Args:
+            imgs (np.ndarray): Batch of images as numpy array (B,H,W,C) in uint8
+        Returns:
+            np.ndarray: Predicted angles in degrees (B,)"""
+        self.eval()
         tf = transforms.Compose(
             [
+                transforms.ToPILImage(),
                 transforms.Resize(640),
                 transforms.CenterCrop(640),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.25, 0.25, 0.25]),
             ]
         )
-        img_t = tf(img_pil).unsqueeze(0)  # (1,3,H,W)
-        self.eval()
+        img_tensors = torch.stack([tf(img) for img in imgs], dim=0)  # (B,C,H,W)
         with torch.no_grad():
-            output = self.forward(img_t)
-        angle = output.detach().cpu().numpy().reshape(-1)[0]
-        return float(angle)
+            outputs = self.forward(img_tensors)  # (B,1)
+        return outputs.detach().cpu().numpy().reshape(-1)  # (B,)
 
 
 # -------------------------------
@@ -248,6 +248,22 @@ def evaluate(model, loader, device, criterion) -> Tuple[float, float]:
 
     preds = np.concatenate(preds)
     trues = np.concatenate(trues)
+    # Log images to Comet.ml
+    for i in range(min(8, len(preds))):
+        img = imgs[i].cpu().permute(1, 2, 0).numpy()
+        img = (img * 0.25) + 0.5  # unnormalize
+        img = np.clip(img * 255, 0, 255).astype(np.uint8)
+        comet_ml.get_global_experiment().log_image(
+            Image.fromarray(img),
+            name=f"val_img_{i}_pred_{preds[i]:.2f}_true_{trues[i]:.2f}",
+            image_format="png",
+            overwrite=False,
+            step=None,
+            metadata={
+                "pred_angle": float(preds[i]),
+                "true_angle": float(trues[i]),
+            },
+        )
     return total_loss / len(loader.dataset), mae_deg(preds, trues)
 
 
@@ -279,8 +295,12 @@ def main():
     experiment = comet_ml.Experiment(project_name="autorotate_finetune")
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--images-train", default="datasets/yolo2/images/train", type=str)
-    ap.add_argument("--images-val", default="datasets/yolo2/images/val", type=str)
+    ap.add_argument(
+        "--images-train", default="datasets/yolo-split_per_book/images/train", type=str
+    )
+    ap.add_argument(
+        "--images-val", default="datasets/yolo-split_per_book/images/val", type=str
+    )
     ap.add_argument("--out-dir", default="rotate_finetune_model", type=str)
     ap.add_argument("--image-size", default=640, type=int)
     ap.add_argument("--batch-size", default=32, type=int)
@@ -293,7 +313,7 @@ def main():
     ap.add_argument("--angle-max", default=10.0, type=float)
     ap.add_argument(
         "--aug-rotate-prob",
-        default=1.0,
+        default=0.8,
         type=float,
         help="probability to apply rotation on train",
     )
@@ -324,16 +344,23 @@ def main():
     device = torch.device("mps")
     print(f"Using device: {device}")
 
+    train_filenames = [
+        os.path.join(cfg.images_train, f) for f in os.listdir(cfg.images_train)
+    ]
+    val_filenames = [
+        os.path.join(cfg.images_val, f) for f in os.listdir(cfg.images_val)
+    ]
+
     # Datasets & loaders
     train_ds = PageAngleDataset(
-        cfg.images_train,
+        train_filenames,
         cfg.image_size,
         is_train=True,
         angle_max=cfg.angle_max,
         aug_rotate_prob=cfg.aug_rotate_prob,
     )
     val_ds = PageAngleDataset(
-        cfg.images_val,
+        val_filenames,
         cfg.image_size,
         is_train=False,
         angle_max=cfg.angle_max,
@@ -400,15 +427,20 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # main()
 
     # load and test the model
     model = AngleDegModel(angle_max=10.0)
     ckpt_path = "rotate_finetune_model/best.pth"
     load_checkpoint(ckpt_path, model, map_location="cpu")
-    images_path = "datasets/yolo2/images/val"
+    images_path = "datasets/yolo-split_per_book/images/test"
+    test_filenames = [os.path.join(images_path, f) for f in os.listdir(images_path)]
     dataset = PageAngleDataset(
-        images_path, image_size=640, is_train=True, angle_max=10.0, aug_rotate_prob=1.0
+        test_filenames,
+        image_size=640,
+        is_train=False,
+        angle_max=10.0,
+        aug_rotate_prob=1.0,
     )
     loader = DataLoader(
         dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True

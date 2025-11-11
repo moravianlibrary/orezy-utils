@@ -2,7 +2,7 @@ import os
 import json
 from PIL import Image
 
-from main import run_crop_pipeline
+from visualization_app.main import run_crop_pipeline
 
 
 def resize_images(input_dir, output_dir):

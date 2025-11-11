@@ -1,16 +1,29 @@
-import os
 import cv2
 import numpy as np
-import streamlit as st
 import logging
 
 import math
-from typing import Optional
 
-logger = logging.getLogger(__name__)
+from train_app.rotate_finetune import AngleDegModel, load_checkpoint
+from utils import xywh_to_xyxy_denorm
+from schemas import Scan
+
+logger = logging.getLogger("auto-crop-ml")
+
+angle_model = None
 
 
-def _weighted_median(angles, weights):
+def _ensure_angle_predictor():
+    global angle_model
+    if angle_model is None:
+        angle_model = AngleDegModel(angle_max=10.0)
+        angle_model.eval()
+        ckpt = "rotate_finetune_model/best.pth"
+        load_checkpoint(ckpt, angle_model, map_location="cpu")
+    return angle_model
+
+
+def _weighted_median(angles: list[float], weights: list[float]) -> float:
     """Computes the weighted median of a list of angles (in degrees)."""
     logger.debug(f"Computing weighted median from {len(angles)} angles")
 
@@ -32,7 +45,17 @@ def _normalize_angle_deg(theta: float) -> float:
     return theta
 
 
-def get_skew_angle_hough(img) -> Optional[float]:
+def get_skew_angle_ml(img: np.ndarray) -> float:
+    """
+    Estimate document skew using a trained ResNET model.
+    Returns the angle (degrees) to rotate.
+    """
+    model = _ensure_angle_predictor()
+    angles = model.predict([img])[0]
+    return angles
+
+
+def get_skew_angle_hough(img: np.ndarray) -> float:
     """
     Estimate document skew using Canny + Probabilistic Hough.
     Returns the angle (degrees) to rotate
@@ -70,7 +93,7 @@ def get_skew_angle_hough(img) -> Optional[float]:
     # draw lines on image
     if lines is not None:
         for x1, y1, x2, y2 in lines[:, 0, :]:
-            cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 3)
+            cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 1)
 
     # Fallback: try directly on the binarized image if needed
     if lines is None or len(lines) == 0:
@@ -112,15 +135,17 @@ def get_skew_angle_hough(img) -> Optional[float]:
     return skew  # rotate CCW by this to deskew
 
 
-if __name__ == "__main__":
-    folder = os.getenv("SCAN_DATA_PATH")
-    files = sorted(os.listdir(folder))[:100]
+def rotate_images(results: list[Scan]) -> list[Scan]:
+    for result in results:
+        im = cv2.imread(result.filename)
+        for page in result.predicted_pages:
+            h, w = im.shape[0], im.shape[1]
+            x1, y1, x2, y2 = xywh_to_xyxy_denorm(
+                (page.xc, page.yc, page.width, page.height),
+                (w, h),
+            )
+            crop = im[y1:y2, x1:x2]
 
-    for file in files:
-        im = cv2.imread(os.path.join(folder, file))
-        w, h = im.shape[1], im.shape[0]
-
-        angle = get_skew_angle_hough(im)
-        M = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
-        deskewed = cv2.warpAffine(im, M, (w, h))
-        st.image(deskewed, title=f"Deskewed by {angle} [{file}]", width=400)
+            angle = get_skew_angle_hough(crop)
+            page.angle = angle
+    return results

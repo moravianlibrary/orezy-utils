@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
-from utils import bbox_from_image_contours
+from visualization_app.utils import bbox_from_image_contours
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)

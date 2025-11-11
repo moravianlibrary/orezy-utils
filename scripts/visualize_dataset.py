@@ -8,14 +8,17 @@ import os
 
 
 project_path = os.getenv("SCAN_DATA_PATH")
-ground_truth_path = f"data/dataset/{project_path.split('/')[-1]}.json"
+project_files = sorted(os.listdir(project_path))
+ground_truth_path = f"datasets/scantailor_data/{project_path.split('/')[-2]}.json"
 
 with open(ground_truth_path, "r") as f:
     ground_truth = json.load(f)
 
-for image, data in list(ground_truth.items()):
-    img_path = os.path.join(project_path, "rawdata", image)
+for i, data in enumerate(list(ground_truth.values())):
+    image = project_files[i]
+    img_path = os.path.join(project_path, image)
     img = cv2.imread(img_path)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     for _ in range(data["orientation"] // 90):
         img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
@@ -33,7 +36,7 @@ for image, data in list(ground_truth.items()):
         (h, w) = img.shape[:2]
         # Compute the center of the image
         center = (w // 2, h // 2)
-        angle = -data["crop"][0]["rotation"]
+        angle = data["crop"][0]["rotation"]
 
         # Get rotation matrix
         M = cv2.getRotationMatrix2D(center, angle, 1.0)

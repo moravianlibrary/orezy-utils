@@ -20,6 +20,17 @@ def xywh_to_xyxy_denorm(box, image_size):
     return (x1, y1, x2, y2)
 
 
+def xywh_to_xywh_denorm(box, image_size):
+    """Converts bounding box from YOLO format to denormalized [x_center, y_center, width, height] format."""
+    x_center, y_center, width, height = box
+    return (
+        x_center * image_size[0],
+        y_center * image_size[1],
+        width * image_size[0],
+        height * image_size[1],
+    )
+
+
 def bbox_union(boxes):
     """Returns a bounding box that covers all given boxes.
 
