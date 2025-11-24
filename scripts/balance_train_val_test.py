@@ -2,39 +2,23 @@
 
 import os
 
-file_prefixes = [
-    "2610063016",
-    "double_2610063016",
-]
+def move(file_prefixes):
+    from_dir = "datasets/yolo-split_per_book/images/train"
+    to_dir = "datasets/yolo-split_per_book/images/val"
+    os.makedirs(to_dir, exist_ok=True)
+    moved_files = 0
+    for filename in os.listdir(from_dir):
+        if any(filename.startswith(prefix) for prefix in file_prefixes):
+            src_path = os.path.join(from_dir, filename)
+            dst_path = os.path.join(to_dir, filename)
+            os.rename(src_path, dst_path)
+            moved_files += 1
 
-from_dir = "datasets/yolo-split_per_book/images/train"
-to_dir = "datasets/yolo-split_per_book/images/val"
-os.makedirs(to_dir, exist_ok=True)
-moved_files = 0
-for filename in os.listdir(from_dir):
-    if any(filename.startswith(prefix) for prefix in file_prefixes):
-        src_path = os.path.join(from_dir, filename)
-        dst_path = os.path.join(to_dir, filename)
-        os.rename(src_path, dst_path)
-        moved_files += 1
-
-print(f"Moved {moved_files} files from {from_dir} to {to_dir}.")
-
-from_dir = "datasets/yolo-split_per_book/labels/train"
-to_dir = "datasets/yolo-split_per_book/labels/val"
-os.makedirs(to_dir, exist_ok=True)
-moved_files = 0
-for filename in os.listdir(from_dir):
-    if any(filename.startswith(prefix) for prefix in file_prefixes):
-        src_path = os.path.join(from_dir, filename)
-        dst_path = os.path.join(to_dir, filename)
-        os.rename(src_path, dst_path)
-        moved_files += 1
-
-print(f"Moved {moved_files} files from {from_dir} to {to_dir}.")
+    print(f"Moved {moved_files} files from {from_dir} to {to_dir}.")
 
 
-prefix = "datasets/yolo-split_per_book/images/"
+
+prefix = "datasets/yolo-all-batches/labels"
 
 for folder in ["train", "val", "test"]:
     path = os.path.join(prefix, folder)

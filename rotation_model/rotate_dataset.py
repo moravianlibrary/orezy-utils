@@ -133,7 +133,7 @@ class PageAngleDataset(Dataset):
         # Crop
         x1, y1, x2, y2 = self._cxywh_to_xyxy(xc, yc, w, h)
         if self.is_train:
-            x1, y1, x2, y2 = self._add_jitter(x1, y1, x2, y2, jitter_scale=int(0.025 * img_w))
+            x1, y1, x2, y2 = self._add_jitter(x1, y1, x2, y2, jitter_scale=int(0.03 * img_w))
 
         # Clamp to image boundaries
         x1 = max(0, x1)

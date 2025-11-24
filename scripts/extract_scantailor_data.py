@@ -31,6 +31,13 @@ from typing import Dict, Any, Optional, List
 import json
 import os
 
+from pyparsing import Enum
+
+
+class ClassificationClass(Enum):
+    page = 0
+    back_cover = 1
+    double_page = 2
 
 def _lname(tag: str) -> str:
     return tag.split("}", 1)[-1] if "}" in tag else tag
@@ -144,8 +151,10 @@ def load_scantailor_crops(
         f = file_map.get(file_id)
         if not f:
             return None
-        return Path(f["name"]).name
-
+        
+        filename = f["name"]
+        filename = filename.replace("_", "-", count=1).replace(".tiff", ".jpg").replace(".tif", ".jpg")
+        return filename
     # --- Collect per-page parameters ---
     deskew_angles = {}
     for el in root.iter():
@@ -226,7 +235,7 @@ def load_scantailor_crops(
     # --- Build grouped results: image_name -> list of page dicts ---
     grouped = {}
     for pid in page_to_image.keys():
-        img_name = page_to_filename(pid).replace("_", "/", count=1)
+        img_name = page_to_filename(pid)
         if not img_name:
             continue
         grouped[img_name] = {"split": None, "crop": [], "orientation": 0}
@@ -234,7 +243,7 @@ def load_scantailor_crops(
     for pid in page_to_image.keys():
         multipage_pid = str(int(pid) - 1)
 
-        img_name = page_to_filename(pid).replace("_", "/", count=1)
+        img_name = page_to_filename(pid)
         if not img_name:
             continue
 
@@ -250,6 +259,9 @@ def load_scantailor_crops(
         else:
             x = y = w = h = None
 
+        if any([v is None for v in (x, y, w, h, rot)]):
+            print(f"Warning: Incomplete data for page ID {pid} (image {img_name}, project {project_path})")
+            continue
         grouped[img_name]["crop"].append(
             {
                 "rotation": rot,
@@ -259,30 +271,80 @@ def load_scantailor_crops(
                 "height": h,
             }
         )
-
         if multipage_pid in split_pages:
             grouped[img_name]["split"] = split_pages[multipage_pid]
 
     return dict(grouped)
 
+def delete_invalid_pages(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Removes pages with invalid crop data from the dataset."""
+    for key, value in data.items():
+        # delete empty crops
+        for crop in reversed(value["crop"]):
+            if crop["width"] is None or crop["width"] == 0:
+                print(f"Removing invalid page {key} due to invalid crop width {crop['width']}.")
+                value["crop"].remove(crop)
+                if value["split"] is not None:
+                    value["split"] = None
+        # delete extra splits
+        if value["split"] is not None and len(value["crop"]) < 2:
+            print(f"Removing split from page {key} due to insufficient crops ({len(value['crop'])} crops).")
+            value["split"] = None
+        # delete crop if page was meant to be a doublepage
+        if value["split"] is not None and value["crop"][0]["width"] / value["crop"][1]["width"] > 2.0:
+            print(f"Removing crop from page {key} due to likely double page with invalid split.")
+            value["crop"] = value["crop"][:1]
+            value["split"] = None
+        # delete pages with no crops left
+        if len(value["crop"]) == 0:
+            print(f"Removing page {key} due to no valid crops left.")
+            del data[key]
+    return data
+
+def is_back_cover(data: dict) -> bool:
+    # Height must be similar
+    if abs(data["crop"][0]["height"] - data["crop"][1]["height"]) > 100:
+        return False
+    # Widths must be different by at least 10%
+    if data["crop"][0]["width"] / data["crop"][1]["width"] < 1.1:
+        return False
+    return True
+
+def assign_classes(data: Dict[str, Any]) -> Dict[str, Any]:
+    all_scans = len(list(data.values()))
+    single_pages = len(
+        [d for d in list(data.values()) if d["split"] is None]
+    )
+    single_ratio = single_pages / all_scans
+
+    for key, value in data.items():
+            key = key.replace(".tif", ".jpg").replace("/", "-")
+            if value["split"] is None and single_ratio < 0.9 and value["crop"][0]["width"] > value["crop"][0]["height"]:
+                print(f"Double page detected in at {key}")
+                value["crop"][0]["class"] = ClassificationClass.double_page.value
+            elif value["split"] is not None and is_back_cover(value):
+                print(f"Back cover detected in at {key}")
+                value["crop"][0]["class"] = ClassificationClass.back_cover.value
+                value["crop"][1]["class"] = ClassificationClass.page.value
+            else:
+                for i in range(len(value["crop"])):
+                    value["crop"][i]["class"] = ClassificationClass.page.value
+
+    return data
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract ScanTailor crop data.")
     parser.add_argument(
         "--input",
         type=str,
+        default="/Users/lucienovotna/Documents/ai-orezy-compressed",
         help="Path to the input directory containing ScanTailor projects.",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default="datasets/scantailor_data",
-        help="Path to the output directory where JSON files will be saved.",
     )
     args = parser.parse_args()
 
     # Load all directories containing ScanTailor projects
     scan_dirs = os.listdir(args.input)
+    scan_dirs = [d for d in scan_dirs if os.path.isdir(os.path.join(args.input, d))]
 
     for dir in sorted(scan_dirs):
         if not os.path.isdir(os.path.join(args.input, dir)):
@@ -297,10 +359,17 @@ if __name__ == "__main__":
         ]
         for file in sorted(scantailor_files):
             scantailor_path = os.path.join(project_path, file)
+            if "Backup" in scantailor_path:
+                continue  # Skip backup files
             prefix = file.split(".")[0]
             data.update(load_scantailor_crops(scantailor_path, prefix))
 
+
+        # Remove invalid pages
+        data = delete_invalid_pages(data)
+        # Add classes based on heuristics
+        data = assign_classes(data)
         # Save the extracted data to a JSON file
         print(f"Found data for {dir}, files {scantailor_files}")
-        with open(os.path.join(args.output, f"{dir}.json"), "w") as f:
+        with open(os.path.join(project_path, "metadata.json"), "w") as f:
             json.dump(data, f, indent=4)

@@ -33,6 +33,7 @@ def get_bbox_vectors(dir: str) -> list[tuple[float, float, float, float]]:
 def train():
     cfg = TrainConfig()
     device = torch.device("mps")
+    # torch.set_float32_matmul_precision("high")
 
     train_ds = PageAngleDataset(
         image_paths=get_filepaths("datasets/yolo-split_per_book/images/train"),
@@ -57,6 +58,7 @@ def train():
     )
 
     model = AngleDegModel().to(device)
+    torch.compile(model)
 
     comet_ml.login(
         project_name="autorotate_finetune", api_key=os.getenv("COMET_ML_API_KEY")
