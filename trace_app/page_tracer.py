@@ -17,6 +17,7 @@ class PageTracer:
     Image thumbnails are sent via API for prediction. The returned predictions are then
     used to crop the original high-resolution images.
     """
+
     def __init__(self, api_url: str, token: str):
         self.api_url = api_url
         self.token = token
@@ -26,7 +27,7 @@ class PageTracer:
 
     def upload_and_compress(self, input_folder: str, crop_type: str):
         """Uploads and compresses images to the Page Trace API.
-        
+
         Args:
             input_folder (str): Path to the folder containing input images.
             crop_type (str): Type of crop to perform ("inner" or "outer").
@@ -90,7 +91,7 @@ class PageTracer:
 
     def download_results(self, output_folder: str):
         """Downloads the predicted crop coordinates from the API, saves them to disk.
-        
+
         Args:
             output_folder (str): Path to the folder to save the coordinates JSON.
         """
@@ -144,7 +145,7 @@ class PageTracer:
 
     def run(self, input_folder: str, output_folder: str, crop_type: str):
         """Runs the full Page Trace process: upload, process, download, and crop.
-        
+
         Args:
             input_folder (str): Path to the folder containing input images.
             output_folder (str): Path to the folder to save cropped images.
@@ -155,6 +156,7 @@ class PageTracer:
         self.download_results(output_folder)
         self.crop_documents(input_folder, output_folder)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Run Page Trace on a folder of images and convert them to cropped pages."
@@ -164,7 +166,7 @@ if __name__ == "__main__":
         type=str,
         required=False,
         help="API token",
-        default=os.environ.get("BASIC_AUTH_TOKEN", "")
+        default=os.environ.get("BASIC_AUTH_TOKEN", ""),
     )
     parser.add_argument(
         "--input-folder",

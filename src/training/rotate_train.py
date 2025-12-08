@@ -91,7 +91,7 @@ def train():
     comet_ml.login(
         project_name="autorotate_finetune", api_key=os.getenv("COMET_ML_API_KEY")
     )
-    experiment = comet_ml.Experiment(project_name="autorotate_finetune")
+    comet_ml.Experiment(project_name="autorotate_finetune")
 
     model.train_model(
         train_loader,

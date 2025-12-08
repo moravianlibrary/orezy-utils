@@ -1,3 +1,18 @@
+# Page Trace AI
+
+This repository hosts models used to predict tranformation steps needed to extract pages from scanned books and other printed media.
+It is split into *src* (main codebase for the ML models), *scripts* (random data analysis), and *trace_app* (a script which demoes the model
+using Page Trace API). We use 2 models to create page predictions:
+
+## YOCO model: You Only Crop Once
+
+YOCO is a finetuned YOLO network based on YOLO11s (see: https://docs.ultralytics.com/models/yolo11/). It is used to predict the number of pages in a document together with its location.
+
+## RotateNET
+
+RotateNET is a ResNET based model used to predict angle of each page.
+
+
 # Dataset creation
 
 ## Input
@@ -65,11 +80,3 @@ You can use the output structure as an input for rotate and crop finetune nets.
 
 Scripts for model finetuning are stored in `src.training.crop_train` and `src.training.rotate_train`. Both models utilize the same dataset.
 Training reports are periodically saved to CometML, set your environment variable COMET_ML_API_KEY to enable this.
-
-## YOCO model: You Only Crop Once
-
-YOCO is a finetuned YOLO network based on YOLO11s (see: https://docs.ultralytics.com/models/yolo11/). It is used to predict the number of pages in a document together with its location.
-
-## RotateNET
-
-RotateNET is a ResNET based model used to predict angle of each page.
