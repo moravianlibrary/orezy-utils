@@ -2,6 +2,7 @@
 
 import os
 
+
 def move(file_prefixes):
     from_dir = "datasets/yolo-split_per_book/images/train"
     to_dir = "datasets/yolo-split_per_book/images/val"
@@ -15,7 +16,6 @@ def move(file_prefixes):
             moved_files += 1
 
     print(f"Moved {moved_files} files from {from_dir} to {to_dir}.")
-
 
 
 prefix = "datasets/yolo-all-batches/labels"

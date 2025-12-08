@@ -18,7 +18,9 @@ id = response.json()["id"]
 for file in os.listdir(os.getenv("SCAN_DATA_PATH")):
     response = requests.post(
         url + f"/{id}/upload-scan",
-        files={"scan_data": open(os.path.join(os.getenv("SCAN_DATA_PATH"), file), "rb")},
+        files={
+            "scan_data": open(os.path.join(os.getenv("SCAN_DATA_PATH"), file), "rb")
+        },
         headers=headers,
     )
     if response.status_code != 200:

@@ -9,7 +9,10 @@ import argparse
 
 from tqdm import tqdm
 
-def convert_bbox_to_yolo_format(img_properties, img_shape, padded=False, padded_percent=0.1):
+
+def convert_bbox_to_yolo_format(
+    img_properties, img_shape, padded=False, padded_percent=0.1
+):
     """Converts bounding box to YOLO format.
 
     Args:
@@ -19,7 +22,9 @@ def convert_bbox_to_yolo_format(img_properties, img_shape, padded=False, padded_
         list: Bounding box in YOLO format [x_center, y_center, width, height].
     """
     if any([v is None for v in img_properties.values()]):
-        print(f"Warning: Incomplete image properties for image {img_properties.get('name')}")
+        print(
+            f"Warning: Incomplete image properties for image {img_properties.get('name')}"
+        )
         return [0, 0, 0, 0]
     if padded:
         # adjust for padding
@@ -32,6 +37,7 @@ def convert_bbox_to_yolo_format(img_properties, img_shape, padded=False, padded_
     height = img_properties["height"] / h
 
     return [x_center, y_center, width, height]
+
 
 def add_padding(img, img_width, left=True, right=True, percent=0.1):
     """Adds padding to the left and/or right side of the image.
@@ -53,9 +59,8 @@ def add_padding(img, img_width, left=True, right=True, percent=0.1):
     )
     return padded_img
 
-def process_book_double_page(
-    input, output, book_name, split="train"
-):
+
+def process_book_double_page(input, output, book_name, split="train"):
     """Processes a ScanTailor book and saves images as two-page splits in YOLO format.
 
     Args:
@@ -85,9 +90,7 @@ def process_book_double_page(
             for _ in range(img_properties["orientation"] // 90):
                 img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
 
-        page_name = (
-            f"double_{book_name}-{image_name.split('.')[0]}"
-        )
+        page_name = f"double_{book_name}-{image_name.split('.')[0]}"
         # save bbox info in YOLO format
         with open(os.path.join(output, "labels", split, f"{page_name}.txt"), "w") as f:
             # adjust offset from page split
@@ -106,9 +109,8 @@ def process_book_double_page(
         img = cv2.resize(img, new_size, interpolation=cv2.INTER_LINEAR)
         cv2.imwrite(os.path.join(output, "images", split, f"{page_name}.jpg"), img)
 
-def process_book_single_page(
-    input, output, book_name, split="train"
-):
+
+def process_book_single_page(input, output, book_name, split="train"):
     """Processes a ScanTailor book and saves images in YOLO format.
 
     Args:
@@ -131,7 +133,6 @@ def process_book_single_page(
             for _ in range(img_properties["orientation"] // 90):
                 img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
 
-
         pages = []
         # process left and right separately if there is a split
         if img_properties["split"]:
@@ -141,36 +142,37 @@ def process_book_single_page(
             right_divider = min(
                 img_properties["split"]["p1"][0], img_properties["split"]["p2"][0]
             )
+            left_page = img[:, :left_divider]
+            right_page = img[:, right_divider:]
             # add 10% padding to LR side
-            l_size = left_divider
-            left_page = img[:, :int(l_size * 1.1)]
-            left_page = add_padding(
-                left_page, l_size, left=True, right=False
-            )
+            # l_size = left_divider
+            # left_page = img[:, :int(l_size * 1.1)]
+            # left_page = add_padding(
+            #    left_page, l_size, left=True, right=False
+            # )
             # add 10% padding to LR side
-            r_size = img.shape[1] - right_divider
-            right_page = img[:, int(r_size * 0.9):]
-            right_page = add_padding(
-                right_page, r_size, left=False, right=True
-            )
+            # r_size = img.shape[1] - right_divider
+            # right_page = img[:, int(r_size * 0.9):]
+            # right_page = add_padding(
+            #    right_page, r_size, left=False, right=True
+            # )
 
             pages += [left_page, right_page]
         else:
             # add 10% padding to LR side
-            img = add_padding(img, img.shape[1], left=True, right=True)
+            # img = add_padding(img, img.shape[1], left=True, right=True)
             pages.append(img)
 
         # save each page as a separate file
         for i, page in enumerate(pages):
-            page_name = (
-                f"{book_name}-{image_name.split('.')[0]}_p{i}"
-            )
+            page_name = f"{book_name}-{image_name.split('.')[0]}_p{i}"
             # save bbox info in YOLO format
             with open(
                 os.path.join(output, "labels", split, f"{page_name}.txt"), "w"
             ) as f:
                 normalized_bbox = convert_bbox_to_yolo_format(
-                    img_properties["crop"][i], page.shape[:2], padded=True
+                    img_properties["crop"][i],
+                    page.shape[:2],  # padded=True
                 )
                 img_class = img_properties["crop"][i]["class"]
                 f.write(f"{img_class} {' '.join(map(str, normalized_bbox))}\n")
@@ -212,7 +214,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output",
         type=str,
-        default="datasets/yolo-all-batches",
+        default="datasets/yolo-all-batches-no-padding",
         help="Path to the output directory for YOLO formatted images.",
     )
 
@@ -236,8 +238,8 @@ if __name__ == "__main__":
     test_size = len(all_books) - train_size - val_size
 
     train = all_books[:train_size]
-    val = all_books[train_size:train_size + val_size]
-    test = all_books[train_size + val_size:]
+    val = all_books[train_size : train_size + val_size]
+    test = all_books[train_size + val_size :]
 
     # ensure book 2610055011 is in TEST set
     if "2610055011" not in test:
@@ -252,13 +254,9 @@ if __name__ == "__main__":
         # Create output directories for the split
         os.makedirs(os.path.join(output, "images", split_name), exist_ok=True)
         os.makedirs(os.path.join(output, "labels", split_name), exist_ok=True)
-        
+
         for book in tqdm(books, desc=f"Processing {split_name} set"):
             # Process each book
             print(f"Processing book: {book}")
-            process_book_single_page(
-                input, output, book, split=split_name
-            )
-            process_book_double_page(
-                input, output, book, split=split_name
-            )
+            process_book_single_page(input, output, book, split=split_name)
+            process_book_double_page(input, output, book, split=split_name)
