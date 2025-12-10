@@ -135,11 +135,33 @@ class PageTracer:
                     int(yc - hh / 2) : int(yc + hh / 2),
                     int(xc - ww / 2) : int(xc + ww / 2),
                 ]
-                # save to disk
+
+                img_format = Image.open(os.path.join(input_folder, img_name)).format or "JPEG"
+                ext = img_format.lower()
+                if ext == "jpeg":
+                    ext = "jpg"
+
+                # rebuild output_path with preferred extension
                 output_path = os.path.join(
-                    output_folder, f"{os.path.splitext(img_name)[0]}_page{i + 1}.jpg"
+                    output_folder, f"{os.path.splitext(img_name)[0]}_page{i + 1}.{ext}"
                 )
-                cv2.imwrite(output_path, output_image)
+
+                # convert cv2 BGR/BGRA -> PIL RGB/RGBA
+                if output_image.ndim == 2:
+                    pil_img = Image.fromarray(output_image)
+                else:
+                    if output_image.shape[2] == 3:
+                        pil_img = Image.fromarray(cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB))
+                    elif output_image.shape[2] == 4:
+                        pil_img = Image.fromarray(cv2.cvtColor(output_image, cv2.COLOR_BGRA2RGBA))
+                    else:
+                        pil_img = Image.fromarray(output_image)
+
+                # save using the original image format (with sensible defaults for JPEG)
+                save_kwargs = {}
+                if img_format in ("JPEG", "JPG"):
+                    save_kwargs["quality"] = 95
+                pil_img.save(output_path, format=img_format, **save_kwargs)
 
         print(f"Success! Cropped images saved to {output_folder}")
 
