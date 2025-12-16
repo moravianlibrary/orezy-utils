@@ -48,8 +48,10 @@ class PageTracer:
                 im = Image.open(f)
                 im.thumbnail((1024, 1024))
                 buf = BytesIO()
-                fmt = im.format or "JPEG"
-                im.save(buf, format=fmt)
+                # Convert to JPG
+                im.save(buf, format="JPEG")
+                img = img.rsplit(".", 1)[0] + ".jpg"
+                
                 buf.seek(0)
                 response = requests.post(
                     url=urljoin(self.api_url, f"{self.id}/upload-scan"),
@@ -173,8 +175,18 @@ class PageTracer:
             output_folder (str): Path to the folder to save cropped images.
             crop_type (str): Type of crop to perform ("inner" or "outer").
         """
-        self.upload_and_compress(input_folder, crop_type)
-        self.process()
+        try:
+            self.upload_and_compress(input_folder, crop_type)
+            self.process()
+        except Exception as e:
+            if self.id:
+                requests.delete(
+                    url=urljoin(self.api_url, f"{self.id}"),
+                    headers={"Authorization": f"Bearer {self.token}"},
+                )
+                print(f"Deleted job {self.id} due to error.")   
+            raise e
+        
         self.download_results(output_folder)
         self.crop_documents(input_folder, output_folder)
 
