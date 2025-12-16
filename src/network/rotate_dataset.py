@@ -190,12 +190,12 @@ if __name__ == "__main__":
     # Example usage
     dataset = PageAngleDataset(
         image_paths=[
-            "/Users/lucienovotna/Documents/orezy-utils/datasets/yolo-all-batches-no-padding/images/test/2610055011-1-v0001_p1.jpg",
-            "/Users/lucienovotna/Documents/orezy-utils/datasets/yolo-all-batches-no-padding/images/test/2610149691-1-a0110_p0.jpg",
-            "/Users/lucienovotna/Documents/orezy-utils/datasets/yolo-all-batches-no-padding/images/test/2610055011-1-v0003_p1.jpg",
-            "/Users/lucienovotna/Documents/orezy-utils/datasets/yolo-all-batches-no-padding/images/test/2619025743-2-0006_p0.jpg",
-            "/Users/lucienovotna/Documents/orezy-utils/datasets/yolo-all-batches-no-padding/images/test/2619025743-2-0006_p0.jpg",
-            "/Users/lucienovotna/Documents/orezy-utils/datasets/yolo-all-batches-no-padding/images/test/2619025743-2-0006_p0.jpg",
+            "datasets/yolo-all-batches-no-padding/images/test/2610055011-1-v0001_p1.jpg",
+            "datasets/yolo-all-batches-no-padding/images/test/2610149691-1-a0110_p0.jpg",
+            "datasets/yolo-all-batches-no-padding/images/test/2610055011-1-v0003_p1.jpg",
+            "datasets/yolo-all-batches-no-padding/images/test/2619025743-2-0006_p0.jpg",
+            "datasets/yolo-all-batches-no-padding/images/test/2619025743-2-0006_p0.jpg",
+            "datasets/yolo-all-batches-no-padding/images/test/2619025743-2-0006_p0.jpg",
         ],
         image_bboxes=[
             (0.5, 0.5, 0.9, 0.9),

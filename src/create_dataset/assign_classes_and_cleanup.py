@@ -38,16 +38,16 @@ def walk_through_dataset():
     }
     books = [
         d
-        for d in os.listdir("/Users/lucienovotna/Documents/ai-orezy-compressed")
+        for d in os.listdir("ai-orezy-compressed")
         if os.path.isdir(
-            os.path.join("/Users/lucienovotna/Documents/ai-orezy-compressed", d)
+            os.path.join("ai-orezy-compressed", d)
         )
     ]
 
     for book in books:
         with open(
             os.path.join(
-                "/Users/lucienovotna/Documents/ai-orezy-compressed",
+                "ai-orezy-compressed",
                 book,
                 "scanTailor",
                 "metadata.json",
@@ -87,7 +87,7 @@ def walk_through_dataset():
 
 
 def update_dataset(results):
-    base_path = "/Users/lucienovotna/Documents/orezy-utils/datasets/yolo-all-batches"
+    base_path = "datasets/yolo-all-batches"
     for book, images in results["invalid"].items():
         directory = ""
         for split in ["train", "val", "test"]:

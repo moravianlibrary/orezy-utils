@@ -359,7 +359,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--input",
         type=str,
-        default="/Users/lucienovotna/Documents/ai-orezy-compressed",
+        default="ai-orezy-compressed",
         help="Path to the input directory containing ScanTailor projects.",
     )
     args = parser.parse_args()
