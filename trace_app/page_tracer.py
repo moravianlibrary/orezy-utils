@@ -159,10 +159,14 @@ class PageTracer:
                     else:
                         pil_img = Image.fromarray(output_image)
 
-                # save using the original image format (with sensible defaults for JPEG)
+                # Compress with respect to format
                 save_kwargs = {}
                 if img_format in ("JPEG", "JPG"):
                     save_kwargs["quality"] = 95
+                elif img_format == "TIFF":
+                    save_kwargs["compression"] = "tiff_deflate"
+                elif img_format == "PNG":
+                    save_kwargs["compress_level"] = 9
                 pil_img.save(output_path, format=img_format, **save_kwargs)
 
         print(f"Success! Cropped images saved to {output_folder}")
