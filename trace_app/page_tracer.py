@@ -25,15 +25,16 @@ class PageTracer:
         self.id = None
         self.coordinates = None
 
-    def upload_and_compress(self, input_folder: str, crop_type: str):
+    def upload_and_compress(self, group_id: str, input_folder: str, crop_type: str):
         """Uploads and compresses images to the Page Trace API.
 
         Args:
+            group_id (str): Group ID for the job.
             input_folder (str): Path to the folder containing input images.
             crop_type (str): Type of crop to perform ("inner" or "outer").
         """
         response = requests.post(
-            url=urljoin(self.api_url, "create"),
+            url=urljoin(self.api_url, f"create?group_id={group_id}"),
             headers={"Authorization": f"Bearer {self.token}"},
             json={"crop_type": crop_type},
         )
@@ -171,16 +172,17 @@ class PageTracer:
 
         print(f"Success! Cropped images saved to {output_folder}")
 
-    def run(self, input_folder: str, output_folder: str, crop_type: str):
+    def run(self, group_id: str, input_folder: str, output_folder: str, crop_type: str):
         """Runs the full Page Trace process: upload, process, download, and crop.
 
         Args:
+            group_id (str): Group ID for the job.
             input_folder (str): Path to the folder containing input images.
             output_folder (str): Path to the folder to save cropped images.
             crop_type (str): Type of crop to perform ("inner" or "outer").
         """
         try:
-            self.upload_and_compress(input_folder, crop_type)
+            self.upload_and_compress(group_id, input_folder, crop_type)
             self.process()
         except Exception as e:
             if self.id:
@@ -200,11 +202,25 @@ if __name__ == "__main__":
         description="Run Page Trace on a folder of images and convert them to cropped pages."
     )
     parser.add_argument(
-        "--token",
+        "--username",
         type=str,
         required=False,
-        help="API token",
-        default=os.environ.get("BASIC_AUTH_TOKEN", ""),
+        help="API username",
+        default=os.environ.get("LOGIN_EMAIL", ""),
+    )
+    parser.add_argument(
+        "--password",
+        type=str,
+        required=False,
+        help="API password",
+        default=os.environ.get("LOGIN_PASSWORD", ""),
+    )
+    parser.add_argument(
+        "--group",
+        type=str,
+        required=False,
+        help="Group id",
+        default=os.environ.get("GROUP_ID", ""),
     )
     parser.add_argument(
         "--input-folder",
@@ -234,8 +250,22 @@ if __name__ == "__main__":
 
     print(f"Starting Page Tracer for folder {args.input_folder}...")
 
-    tracer = PageTracer(api_url=args.api_url, token=args.token)
+    # Authenticate and get token
+    try:
+        token = requests.post(
+            url=urljoin(args.api_url, "users/login"),
+            data={
+                "username": args.username,
+                "password": args.password,
+            }
+        ).json()
+        token = token["access_token"]
+    except Exception as e:
+        raise Exception("Failed to authenticate. Please check your credentials.") from e
+
+    tracer = PageTracer(api_url=args.api_url, token=token)
     tracer.run(
+        group_id=args.group,
         input_folder=args.input_folder,
         output_folder=args.output_folder,
         crop_type=args.crop_type,
