@@ -105,7 +105,7 @@ class PageTracer:
         if response.status_code != 200:
             raise Exception(f"Failed to download results: {response.text}")
 
-        self.coordinates = response.json()
+        self.coordinates = response.json()["scans"]
         if not os.path.exists(output_folder):
             os.makedirs(output_folder)
         with open(os.path.join(output_folder, "coordinates.json"), "w") as f:
