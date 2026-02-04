@@ -3,7 +3,7 @@ import json
 import time
 from io import BytesIO
 import os
-from PIL import Image
+from PIL import Image, ImageOps
 from urllib.parse import urljoin
 import cv2
 import requests
@@ -18,28 +18,53 @@ class PageTracer:
     used to crop the original high-resolution images.
     """
 
-    def __init__(self, api_url: str, token: str):
+    def __init__(self, api_url: str, api_key: str):
         self.api_url = api_url
-        self.token = token
         self.web_url = "https://orezy.test.trinera.cloud"
         self.id = None
         self.coordinates = None
+        self.api_key = api_key
 
-    def upload_and_compress(self, group_id: str, input_folder: str, crop_type: str):
+        self.authenticate()
+
+    def authenticate(self) -> str:
+        """Authenticates with the API and returns an access token.
+
+        Args:
+            api_url (str): Base URL of the API.
+            username (str): API username.
+            password (str): API password.
+
+        Returns:
+            str: Access token.
+        """
+        try:
+            response = requests.get(
+                url=urljoin(self.api_url, "/groups"),
+                headers={"X-API-Key": self.api_key},
+            )
+            response.raise_for_status()
+            group = response.json()[0]
+            self.group_id = group["_id"]
+        except Exception as e:
+            raise Exception("Failed to authenticate. Please check your API key.") from e
+
+        print(f"Successfully authenticated to group: {group['name']}")
+
+    def upload_and_compress(self, input_folder: str, model: str, name: str):
         """Uploads and compresses images to the Page Trace API.
 
         Args:
-            group_id (str): Group ID for the job.
             input_folder (str): Path to the folder containing input images.
-            crop_type (str): Type of crop to perform ("inner" or "outer").
+            model (str): Type of crop to perform ("inner" or "outer").
+            name (str): Title name of the book.
         """
         response = requests.post(
-            url=urljoin(self.api_url, f"create?group_id={group_id}"),
-            headers={"Authorization": f"Bearer {self.token}"},
-            json={"crop_type": crop_type},
+            url=urljoin(self.api_url, f"create?group_id={self.group_id}"),
+            headers={"X-API-Key": self.api_key},
+            json={"crop_type": model, "external_id": name},
         )
-        if response.status_code != 200:
-            raise Exception(f"Failed to create job: {response.text}")
+        response.raise_for_status()
         self.id = response.json()["id"]
 
         images = sorted(os.listdir(input_folder))
@@ -47,21 +72,24 @@ class PageTracer:
         for img in images:
             with open(os.path.join(input_folder, img), "rb") as f:
                 im = Image.open(f)
-                im.thumbnail((1024, 1024))
+                im = im.convert("RGB")
+                im = ImageOps.exif_transpose(im)
+                im.thumbnail((1200, 1200))
                 buf = BytesIO()
                 # Convert to JPG
                 im.save(buf, format="JPEG")
                 img = img.rsplit(".", 1)[0] + ".jpg"
-                
+
                 buf.seek(0)
                 response = requests.post(
                     url=urljoin(self.api_url, f"{self.id}/upload-scan"),
-                    headers={"Authorization": f"Bearer {self.token}"},
+                    headers={"X-API-Key": self.api_key},
                     files={"scan_data": (img, buf, "image/jpeg")},
                 )
 
-                if response.status_code != 200:
-                    raise Exception(f"Failed to upload image {img}: {response.text}")
+                response.raise_for_status()
+
+        print(f"Created entry with name '{name}' and ID '{self.id}'.")
 
     def process(self):
         """Queues the uploaded images for ML processing and waits for completion.
@@ -70,27 +98,27 @@ class PageTracer:
         print("Predicting page crop coordinates...")
         response = requests.post(
             url=urljoin(self.api_url, f"{self.id}/process"),
-            headers={"Authorization": f"Bearer {self.token}"},
+            headers={"X-API-Key": self.api_key},
         )
-        if response.status_code != 200:
-            raise Exception(f"Failed to start processing: {response.text}")
+        response.raise_for_status()
 
         state = requests.get(
             url=urljoin(self.api_url, f"{self.id}/status"),
-            headers={"Authorization": f"Bearer {self.token}"},
+            headers={"X-API-Key": self.api_key},
         )
-        while state.json() != "ready":
+        while state.json() != "in_progress":
             time.sleep(10)
             state = requests.get(
                 url=urljoin(self.api_url, f"{self.id}/status"),
-                headers={"Authorization": f"Bearer {self.token}"},
+                headers={"X-API-Key": self.api_key},
             )
             print(f"Current status: {state.text}")
-        if state.status_code != 200:
-            raise Exception(f"Failed to check status: {state.text}")
+        response.raise_for_status()
 
-        print("Results are available at", urljoin(self.web_url, f"book/{self.id}"))
-        input("Press Enter to confirm and download...")
+        print(
+            "Processing! Results will be available at",
+            urljoin(self.web_url, f"book/{self.id}"),
+        )
 
     def download_results(self, output_folder: str):
         """Downloads the predicted crop coordinates from the API, saves them to disk.
@@ -100,10 +128,9 @@ class PageTracer:
         """
         response = requests.get(
             url=urljoin(self.api_url, f"{self.id}/scans"),
-            headers={"Authorization": f"Bearer {self.token}"},
+            headers={"X-API-Key": self.api_key},
         )
-        if response.status_code != 200:
-            raise Exception(f"Failed to download results: {response.text}")
+        response.raise_for_status()
 
         self.coordinates = response.json()["scans"]
         if not os.path.exists(output_folder):
@@ -118,6 +145,8 @@ class PageTracer:
             output_folder (str): Path to the folder to save cropped images.
         """
         images = sorted(os.listdir(input_folder))
+        print(f"Cropping {len(images)} images...")
+
         for img_name, coordinate in zip(images, self.coordinates):
             im = cv2.imread(os.path.join(input_folder, img_name))
             h, w = im.shape[0], im.shape[1]
@@ -139,7 +168,9 @@ class PageTracer:
                     int(xc - ww / 2) : int(xc + ww / 2),
                 ]
 
-                img_format = Image.open(os.path.join(input_folder, img_name)).format or "JPEG"
+                img_format = (
+                    Image.open(os.path.join(input_folder, img_name)).format or "JPEG"
+                )
                 ext = img_format.lower()
                 if ext == "jpeg":
                     ext = "jpg"
@@ -154,9 +185,13 @@ class PageTracer:
                     pil_img = Image.fromarray(output_image)
                 else:
                     if output_image.shape[2] == 3:
-                        pil_img = Image.fromarray(cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB))
+                        pil_img = Image.fromarray(
+                            cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB)
+                        )
                     elif output_image.shape[2] == 4:
-                        pil_img = Image.fromarray(cv2.cvtColor(output_image, cv2.COLOR_BGRA2RGBA))
+                        pil_img = Image.fromarray(
+                            cv2.cvtColor(output_image, cv2.COLOR_BGRA2RGBA)
+                        )
                     else:
                         pil_img = Image.fromarray(output_image)
 
@@ -172,101 +207,118 @@ class PageTracer:
 
         print(f"Success! Cropped images saved to {output_folder}")
 
-    def run(self, group_id: str, input_folder: str, output_folder: str, crop_type: str):
+    def upload_job(self, input_folder: str, model: str, name: str):
         """Runs the full Page Trace process: upload, process, download, and crop.
 
         Args:
-            group_id (str): Group ID for the job.
             input_folder (str): Path to the folder containing input images.
             output_folder (str): Path to the folder to save cropped images.
-            crop_type (str): Type of crop to perform ("inner" or "outer").
+            model (str): Type of crop to perform ("inner" or "outer").
+            name (str): Title name of the book.
         """
         try:
-            self.upload_and_compress(group_id, input_folder, crop_type)
+            self.upload_and_compress(input_folder, model, name)
             self.process()
         except Exception as e:
             if self.id:
                 requests.delete(
                     url=urljoin(self.api_url, f"{self.id}"),
-                    headers={"Authorization": f"Bearer {self.token}"},
+                    headers={"X-API-Key": self.api_key},
                 )
-                print(f"Deleted job {self.id} due to error.")   
+                print(f"Deleted job {self.id} due to error.")
             raise e
-        
+
+    def download_job(self, title_id: str, input_folder: str, output_folder: str):
+        """Downloads results and crops documents.
+        Args:
+            title_id (str): Title ID for the job.
+            input_folder (str): Path to the folder containing input images.
+            output_folder (str): Path to the folder to save cropped images.
+        """
+        self.id = title_id
         self.download_results(output_folder)
         self.crop_documents(input_folder, output_folder)
 
+        print(f"Job completed successfully, scans saved to {output_folder}.")
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run Page Trace on a folder of images and convert them to cropped pages."
-    )
-    parser.add_argument(
-        "--username",
+    parser = argparse.ArgumentParser(prog="page_tracer.py")
+
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--api-key",
         type=str,
-        required=False,
-        help="API username",
-        default=os.environ.get("LOGIN_EMAIL", ""),
+        help="API key for authentication within given group, obtain from group settings in the web app",
     )
-    parser.add_argument(
-        "--password",
-        type=str,
-        required=False,
-        help="API password",
-        default=os.environ.get("LOGIN_PASSWORD", ""),
-    )
-    parser.add_argument(
-        "--group",
-        type=str,
-        required=False,
-        help="Group id",
-        default=os.environ.get("GROUP_ID", ""),
-    )
-    parser.add_argument(
-        "--input-folder",
-        type=str,
-        required=False,
-        help="Input folder path",
-        default=os.environ.get("SCAN_DATA_PATH", ""),
-    )
-    parser.add_argument(
-        "--output-folder",
-        type=str,
-        required=False,
-        help="Output folder path",
-        default="output",
-    )
-    parser.add_argument(
-        "--crop-type", type=str, required=False, help="inner / outer", default="inner"
-    )
-    parser.add_argument(
+    common.add_argument(
         "--api-url",
         type=str,
         required=False,
-        help="API URL",
+        help="Base URL of the Page Trace API, defaults to https://api.ai-orezy.trinera.cloud",
         default="https://api.ai-orezy.trinera.cloud",
     )
-    args = parser.parse_args()
-
-    print(f"Starting Page Tracer for folder {args.input_folder}...")
-
-    # Authenticate and get token
-    try:
-        token = requests.post(
-            url=urljoin(args.api_url, "users/login"),
-            data={
-                "username": args.username,
-                "password": args.password,
-            }
-        ).json()
-        token = token["access_token"]
-    except Exception as e:
-        raise Exception("Failed to authenticate. Please check your credentials.") from e
-
-    tracer = PageTracer(api_url=args.api_url, token=token)
-    tracer.run(
-        group_id=args.group,
-        input_folder=args.input_folder,
-        output_folder=args.output_folder,
-        crop_type=args.crop_type,
+    common.add_argument(
+        "--input-folder",
+        type=str,
+        help="Input folder path (containing images to process)",
     )
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    upload_parser = subparsers.add_parser(
+        "upload",
+        parents=[common],
+        help="Uploads downsized images and schedules job for predictions, outputs link where results will be available.",
+    )
+    upload_parser.add_argument(
+        "--model",
+        type=str,
+        required=False,
+        help="Model name to use for prediction, currently available: [inner, outer]",
+        default="inner",
+    )
+    upload_parser.add_argument(
+        "--name",
+        type=str,
+        required=False,
+        help="Custom title name, defaults to input folder name",
+    )
+
+    download_parser = subparsers.add_parser(
+        "download",
+        parents=[common],
+        help="Downloads predictions with user updates and crops the original images.",
+    )
+    download_parser.add_argument(
+        "--output-folder",
+        type=str,
+        required=False,
+        help="Output folder path (to save cropped images)",
+        default="output",
+    )
+    download_parser.add_argument(
+        "--title",
+        type=str,
+        required=True,
+        help="Title ID",
+    )
+    args = parser.parse_args()
+    if not args.name:
+        args.name = os.path.basename(args.input_folder)
+
+    print(f"Starting Page Tracer {args.command} for folder {args.input_folder}...")
+
+    tracer = PageTracer(api_url=args.api_url, api_key=args.api_key)
+
+    if args.command == "upload":
+        tracer.upload_job(
+            input_folder=args.input_folder,
+            model=args.model,
+            name=args.name,
+        )
+    elif args.command == "download":
+        tracer.download_job(
+            title_id=args.title,
+            input_folder=args.input_folder,
+            output_folder=args.output_folder,
+        )
