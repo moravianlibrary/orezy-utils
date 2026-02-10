@@ -62,7 +62,7 @@ class PageTracer:
         response = requests.post(
             url=urljoin(self.api_url, f"create?group_id={self.group_id}"),
             headers={"X-API-Key": self.api_key},
-            json={"crop_type": model, "external_id": name},
+            json={"model": model, "external_id": name},
         )
         response.raise_for_status()
         self.id = response.json()["id"]
@@ -303,14 +303,14 @@ if __name__ == "__main__":
         help="Title ID",
     )
     args = parser.parse_args()
-    if not args.name:
-        args.name = os.path.basename(args.input_folder)
 
     print(f"Starting Page Tracer {args.command} for folder {args.input_folder}...")
 
     tracer = PageTracer(api_url=args.api_url, api_key=args.api_key)
 
     if args.command == "upload":
+        if not args.name:
+            args.name = os.path.basename(args.input_folder)
         tracer.upload_job(
             input_folder=args.input_folder,
             model=args.model,
