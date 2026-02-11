@@ -274,8 +274,8 @@ if __name__ == "__main__":
         "--model",
         type=str,
         required=False,
-        help="Model name to use for prediction, currently available: [inner, outer]",
-        default="inner",
+        help="Model name to use for prediction",
+        default="default",
     )
     upload_parser.add_argument(
         "--name",
