@@ -1,10 +1,10 @@
 # Cropilot API tools
 
-Cropilot API tools is a set of scripts which allow communication with https://orezy.test.trinera.cloud .
+Cropilot API tools is a set of scripts to communicate with Cropilot application (https://orezy.test.trinera.cloud).
 
 ## Uploader
 
-Uploader.py script allows upload and download of new books. The workflow is as follows: First, a folder of uncropped scans is downscaled and uploaded for processing to Cropilot queue. Then, a job outputs a set of page predictions. When completed, the book becomes available on the web for review. User can change any prediction bounding box in the editor. Predictions can be downloaded and applied to the original folder of images, resulting in high quality cropped scans.
+Uploader.py script allows upload and download of new books. It has the following workflow: In the first script, a folder of uncropped (TIFF) scans is downscaled and uploaded (as JPGs) for processing to Cropilot queue. When completed, the book becomes available on the web for review. During review, user can change any prediction bounding box in the editor. The second script can then download these predictions and apply them to the original folder of images (TIFF), resulting in high quality cropped scans.
 
 ### How to run
 
@@ -45,15 +45,15 @@ options:
 
 ## Trainer
 
-
+Trainer.py is a script which can train and upload a new model to Cropilot. Training custom models enables Cropilot to handle specific and uncommon documents.
 
 ### Requirements
 
-*Create a batch of labelled data*: Before running the trainer, label (create a correct set of crop boxes) one or more titles in the Cropilot editor. We recommend the batch has 100 boxes in total. If you are training from multiple titles, ensure that they belong to the same group.
+*Create a batch of labelled data*: Before running the trainer, label (= create a correct set of crop boxes) one or more titles in the Cropilot editor. We recommend to label around 100 boxes in total. If you are training from multiple titles, ensure that they belong to the same group.
 
 *Have enough resources*: The script needs approx. 10 GB of GPU memory.
 
-*Track progress (Optional)*: The metadata and metrics during training are uploaded to https://www.comet.com/. To enable experiment tracking, set an environment variable `COMET_ML_API_KEY`
+*Track progress (Optional)*: The metadata and metrics during training are uploaded to https://www.comet.com/. To enable experiment tracking, set an environment variable `COMET_ML_API_KEY`.
 
 ### How to run
 
