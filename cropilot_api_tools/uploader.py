@@ -107,13 +107,7 @@ class CropilotUploader:
             url=urljoin(self.api_url, f"{self.id}/status"),
             headers={"X-API-Key": self.api_key},
         )
-        while state.json() != "in_progress":
-            time.sleep(10)
-            state = requests.get(
-                url=urljoin(self.api_url, f"{self.id}/status"),
-                headers={"X-API-Key": self.api_key},
-            )
-            print(f"Current status: {state.text}")
+        print(f"Current status: {state.text}")
         response.raise_for_status()
 
         print(
