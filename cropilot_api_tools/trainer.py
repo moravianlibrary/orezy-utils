@@ -131,6 +131,9 @@ class CropilotTrainer:
             scan (dict): The scan metadata containing page coordinates.
         """
         with open(f"{self.directory}/labels/{scan['_id']}.txt", "w") as f:
+            if "no_prediction" in scan["flags"]:
+                logger.debug(f"Scan {scan['_id']} is flagged as no_prediction, writing empty label file.")
+                return
             for page in scan["pages"]:
                 f.write(f"0 {page['xc']} {page['yc']} {page['width']} {page['height']}\n")
 
