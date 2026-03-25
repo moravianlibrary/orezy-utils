@@ -137,6 +137,7 @@ class PageAngleDataset(Dataset):
         # Load crop coordinates
         img_h, img_w, _ = img.shape
         xc, yc, w, h = self._denormalize_bbox(self.image_bboxes[idx], img_w, img_h)
+        w, h = int(w * 0.05), int(h * 0.05)  # add small padding to bbox
 
         try:
             # Augment images: rotation, translation jitter

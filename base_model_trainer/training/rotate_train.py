@@ -1,8 +1,8 @@
 import os
 
 import numpy as np
-from src.network.rotate_network import AngleDegModel, TrainConfig, load_checkpoint
-from src.network.rotate_dataset import PageAngleDataset
+from base_model_trainer.network.rotate_network import AngleDegModel, TrainConfig, load_checkpoint
+from base_model_trainer.network.rotate_dataset import PageAngleDataset
 from torch.utils.data import DataLoader
 import comet_ml
 import torch
@@ -54,9 +54,9 @@ def train():
     torch.set_float32_matmul_precision("high")
 
     train_ds = PageAngleDataset(
-        image_paths=get_filepaths("datasets/yolo-all-batches-no-padding/images/train"),
+        image_paths=get_filepaths("datasets/yolo-all-batches-rotate/images/train"),
         image_bboxes=get_bbox_vectors(
-            "datasets/yolo-all-batches-no-padding/labels/train"
+            "datasets/yolo-all-batches-rotate/labels/train"
         ),
         is_train=True,
         image_size=cfg.image_size,
@@ -64,9 +64,9 @@ def train():
         # use_canny=True,
     )
     val_ds = PageAngleDataset(
-        image_paths=get_filepaths("datasets/yolo-all-batches-no-padding/images/val"),
+        image_paths=get_filepaths("datasets/yolo-all-batches-rotate/images/val"),
         image_bboxes=get_bbox_vectors(
-            "datasets/yolo-all-batches-no-padding/labels/val"
+            "datasets/yolo-all-batches-rotate/labels/val"
         ),
         is_train=True,
         image_size=cfg.image_size,
@@ -107,9 +107,9 @@ def test():
     device = torch.device("mps")
 
     test_ds = PageAngleDataset(
-        image_paths=get_filepaths("datasets/yolo-all-batches-no-padding/images/test"),
+        image_paths=get_filepaths("datasets/yolo-all-batches-rotate/images/test"),
         image_bboxes=get_bbox_vectors(
-            "datasets/yolo-all-batches-no-padding/labels/test"
+            "datasets/yolo-all-batches-rotate/labels/test"
         ),
         is_train=True,
         image_size=640,
