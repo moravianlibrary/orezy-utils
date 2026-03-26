@@ -163,16 +163,14 @@ class CropilotUploader:
                     int(xc - ww / 2) : int(xc + ww / 2),
                 ]
 
-                img_format = (
-                    Image.open(os.path.join(input_folder, img_name)).format or "JPEG"
-                )
-                ext = img_format.lower()
-                if ext == "jpeg":
-                    ext = "jpg"
+                # get properties of the original image
+                with Image.open(os.path.join(input_folder, img_name)) as orig_img:
+                    save_kwargs = orig_img.info.copy()
+                    img_extension = orig_img.format.lower()
 
                 # rebuild output_path with preferred extension
                 output_path = os.path.join(
-                    output_folder, f"{os.path.splitext(img_name)[0]}_page{i + 1}.{ext}"
+                    output_folder, f"{os.path.splitext(img_name)[0]}_page{i + 1}.{img_extension}"
                 )
 
                 # convert cv2 BGR/BGRA -> PIL RGB/RGBA
@@ -190,15 +188,7 @@ class CropilotUploader:
                     else:
                         pil_img = Image.fromarray(output_image)
 
-                # Compress with respect to format
-                save_kwargs = {}
-                if img_format in ("JPEG", "JPG"):
-                    save_kwargs["quality"] = 95
-                elif img_format == "TIFF":
-                    save_kwargs["compression"] = "tiff_deflate"
-                elif img_format == "PNG":
-                    save_kwargs["compress_level"] = 9
-                pil_img.save(output_path, format=img_format, **save_kwargs)
+                pil_img.save(output_path, format=img_extension.upper(), **save_kwargs)
 
         print(f"Success! Cropped images saved to {output_folder}")
 
