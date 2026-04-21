@@ -1,6 +1,5 @@
 import argparse
 import json
-import time
 from io import BytesIO
 import os
 from PIL import Image, ImageOps

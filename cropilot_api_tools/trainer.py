@@ -12,10 +12,13 @@ import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+os.environ["COMET_DISABLE_AUTO_LOGGING"] = "1"
+os.environ["COMET_LOG_ARGUMENTS"] = "0"
 
 comet_ml.login(
     project_name="crop-finetune-domain-specific", api_key=os.getenv("COMET_ML_API_KEY")
 )
+exp = comet_ml.start(project_name="crop-finetune-domain-specific")
 
 class CropilotTrainer:
     """Automates the process of fine-tuning a YOLO model for Cropilot.
@@ -84,9 +87,10 @@ class CropilotTrainer:
         
     def upload_trained_model(self):
         """Uploads the trained model to the API."""
-        model_path = [f for f in os.listdir("crop-finetune-domain-specific") if f.startswith(self.model_name)]
+        train_path = "runs/detect/crop-finetune-domain-specific"
+        model_path = [f for f in os.listdir(train_path) if f.startswith(self.model_name)]
         model_path = sorted(model_path)[-1]
-        model_path = os.path.join("crop-finetune-domain-specific", model_path, "weights", "best.pt")
+        model_path = os.path.join(train_path, model_path, "weights", "best.pt")
         os.rename(model_path, f"{self.model_name}.pt")
 
         with open(f"{self.model_name}.pt", "rb") as f:
@@ -131,7 +135,7 @@ class CropilotTrainer:
             scan (dict): The scan metadata containing page coordinates.
         """
         with open(f"{self.directory}/labels/{scan['_id']}.txt", "w") as f:
-            if "no_prediction" in scan["flags"]:
+            if "no_prediction" in scan["flags"] and not scan["edited"]:
                 logger.debug(f"Scan {scan['_id']} is flagged as no_prediction, writing empty label file.")
                 return
             for page in scan["pages"]:
@@ -204,7 +208,7 @@ class CropilotTrainer:
             max_det=2,
             single_cls=True,
         )
-    
+
     def cleanup(self):
         """Cleans up resources used during the training job."""
         if os.path.exists(self.directory):
@@ -222,28 +226,37 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(prog="trainer.py")
 
     parser.add_argument(
-        "--api_url",
+        "--api-url",
         type=str,
         default="https://api.ai-orezy.trinera.cloud/",
         help="Base URL of the API (default: https://api.ai-orezy.trinera.cloud/)",
     )
     parser.add_argument(
-        "--base_model",
+        "--base-model",
         type=str,
         default="base_models/default.pt",
         help="Path to the base YOLO model to fine-tune (default: base_models/default.pt)",
     )
     parser.add_argument(
-        "--api_key", type=str, help="Group API key for authentication"
+        "--api-key", type=str, help="Group API key for authentication"
     )
     parser.add_argument(
-        "--model_name", type=str, help="New name of the fine-tuned model"
+        "--model-name", type=str, help="New name of the fine-tuned model"
     )
     parser.add_argument(
-        "--title_ids", nargs="+", default=[], help="List of title IDs to train on"
+        "--title-ids", nargs="+", default=[], help="List of title IDs to train on"
     )
 
     args = parser.parse_args()
+
+    # Log parameters to Comet.ml
+    exp.log_parameters({
+        "base_model": args.base_model,
+        "model_name": args.model_name,
+        "title_ids": args.title_ids,
+    })
+    exp.add_tags(args.title_ids)
+    exp.set_name(args.model_name)
 
     trainer = CropilotTrainer(
         api_url=args.api_url,
@@ -252,3 +265,5 @@ if __name__ == "__main__":
         model_name=args.model_name,
     )
     trainer.train_job(title_ids=args.title_ids)
+
+    exp.end()
