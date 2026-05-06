@@ -58,7 +58,7 @@ class CropilotUploader:
             model (str | None): Type of crop to perform ("inner" or "outer").
             name (str): Title name of the book.
         """
-        args = {"model": model, "external_id": name} if model else {"external_id": name}
+        args = {"settings": {"crop_model": model}, "external_id": name} if model else {"external_id": name}
         response = requests.post(
             url=urljoin(self.api_url, f"create?group_id={self.group_id}"),
             headers={"X-API-Key": self.api_key},
